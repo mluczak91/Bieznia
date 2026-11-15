@@ -60,6 +60,10 @@ details{margin-top:8px}
 .hrz{font:600 13px var(--body);padding:2px 8px;border-radius:999px;color:#fff;margin-left:6px;vertical-align:middle}
 .zset{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--mut)}
 .zset input{width:72px;font:600 15px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.alarm{position:fixed;left:0;right:0;top:0;z-index:20;background:#e5484d;color:#fff;font:700 20px var(--body);text-align:center;
+ padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px))}
+.lim{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--mut)}
+.lim input{width:72px;font:600 15px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 .leg{display:inline-flex;align-items:center;gap:6px}
 .leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 summary{cursor:pointer;color:var(--mut);font-size:14px}
@@ -72,6 +76,13 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="btns shoes" id="shoes">
  <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Inne">Inne</button>
 </div>
+
+<h2>Trening</h2>
+<div class="btns shoes" id="plans">
+ <button data-p="easy">Spokojny &lt; 135</button><button data-p="long">Długi &lt; 140</button><button data-p="int">Interwały</button><button data-p="free">Bez limitu</button>
+</div>
+<div class="lim"><label for="limIn">Alarm tętna powyżej</label><input id="limIn" type="number" inputmode="numeric" min="100" max="200"><span>· dźwięk + wibracja po 10 s nad limitem</span></div>
+<div class="alarm" id="alarm" hidden></div>
 
 <div class="big"><span class="l">Dystans z bieżni</span><span class="v" id="dist">0,00 km</span><span class="st" id="dist2">Z prędkości: 0,00 km</span></div>
 
@@ -186,6 +197,25 @@ function zoneHtml(zs,cur){const b=zoneB(),tot=zs.reduce((a,c)=>a+c,0)||1;
  return [4,3,2,1,0].map(i=>`<div class="zr${cur===i?' now':''}"><span style="color:${ZCOL[i]}">Z${i+1}</span><span class="st">${b[i]}–${b[i+1]}</span><span class="zb"><i style="width:${(zs[i]/tot*100).toFixed(0)}%;background:${ZCOL[i]}"></i></span><span>${fmtT(zs[i])}</span><span class="st">${Math.round(zs[i]/tot*100)}%</span></div>`).join('')}
 function renderZones(){$('zones').innerHTML=zoneHtml(S.zoneSecs,S.hrLive&&S.hr?zoneOf(S.hr):-1)}
 $('hrMaxIn').value=HRMAX;$('hrMaxIn').onchange=e=>{const v=+e.target.value;if(v>=150&&v<=220){HRMAX=v;store.set('hrMax',v);renderZones()}else e.target.value=HRMAX};
+/* ---------- alarm tętna ---------- */
+const PLANS={easy:135,long:140,int:172,free:0};
+let plan=store.get('plan','easy'),LIMIT=store.get('limit',PLANS[plan]),overSince=0,lastBeep=0,ac=null,wasOver=false;
+function setPlan(k){plan=k;store.set('plan',k);LIMIT=PLANS[k];store.set('limit',LIMIT);$('limIn').value=LIMIT||'';
+ document.querySelectorAll('#plans button').forEach(b=>b.classList.toggle('on',b.dataset.p===k))}
+document.querySelectorAll('#plans button').forEach(b=>b.onclick=()=>{setPlan(b.dataset.p);unlockAudio()});
+$('limIn').value=LIMIT||'';document.querySelectorAll('#plans button').forEach(b=>b.classList.toggle('on',b.dataset.p===plan));
+$('limIn').onchange=e=>{const v=+e.target.value;LIMIT=(v>=100&&v<=200)?v:0;store.set('limit',LIMIT);e.target.value=LIMIT||''};
+function unlockAudio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}}
+function beep(freqs,dur){if(!ac)return;let t=ac.currentTime;freqs.forEach(f=>{const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='square';
+ g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.4,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+dur+0.05);t+=dur+0.08})}
+function checkAlarm(){
+ if(!LIMIT||!S.hrLive||!S.hr||$('stop').disabled){$('alarm').hidden=true;overSince=0;return}
+ const now=Date.now();
+ if(S.hr>LIMIT){overSince=overSince||now;
+  if(now-overSince>=10000){$('alarm').hidden=false;$('alarm').textContent='❤️ '+S.hr+' – zwolnij! Limit '+LIMIT;
+   if(now-lastBeep>=30000){lastBeep=now;beep([880,880,880],0.18);try{navigator.vibrate([400,150,400,150,400])}catch(e){}}wasOver=true}}
+ else{overSince=0;$('alarm').hidden=true;if(wasOver&&S.hr<=LIMIT-3){wasOver=false;lastBeep=0;beep([520,660],0.15);try{navigator.vibrate(150)}catch(e){}}}
+}
 function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 function drawChart(cv,prof){
  if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth||300,H=cv.clientHeight||160;
@@ -218,7 +248,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function showErr(t){$('err').textContent=t;$('err').hidden=!t}
 
 $('conn').onclick=async()=>{
- showErr('');
+ showErr('');unlockAudio();
  if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth. Otwórz plik w Chrome na Androidzie.');return}
  try{
   $('st').textContent='Szukam bieżni…';
@@ -227,7 +257,7 @@ $('conn').onclick=async()=>{
   srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
   const ch=await srv.getCharacteristic('treadmill_data');
   await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData);
-  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkSplit();render();drawChart($('live'),S.prof)},1000)}
+  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkAlarm();checkSplit();render();drawChart($('live'),S.prof)},1000)}
   $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
   $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
  }catch(e){$('st').textContent='Nie połączono';showErr(e.name==='NotFoundError'?'Nie wybrano bieżni albo żadnej nie znaleziono. Włącz bieżnię i spróbuj jeszcze raz.':(e.name==='SecurityError'?'Przeglądarka blokuje Bluetooth na tej stronie.':'Błąd: '+e.message))}
@@ -277,7 +307,7 @@ let hrDev=null;
 function onHr(e){const v=e.target.value,f=v.getUint8(0);const hr=(f&1)?v.getUint16(1,true):v.getUint8(1);if(!hr)return;
  S.hrLive=true;S.hr=hr;S.hrMax=Math.max(S.hrMax,hr);if(!$('stop').disabled){S.hrSum+=hr;S.hrN++}render()}
 $('hrBtn').onclick=async()=>{
- showErr('');if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
+ showErr('');unlockAudio();if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
  try{$('hrSt').textContent='Szukam pulsometru…';
   hrDev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
   hrDev.addEventListener('gattserverdisconnected',()=>{S.hrLive=false;$('hrSt').innerHTML='<b>Tętno rozłączone</b>, kliknij ponownie';$('hrBtn').disabled=false});
@@ -289,11 +319,11 @@ $('hrBtn').onclick=async()=>{
 
 /* ---------- koniec biegu, historia ---------- */
 $('stop').onclick=()=>{
- clearInterval(tick);try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
+ clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
  let acc=0;const sp=S.splits.map((s,i)=>{acc+=s;return `${i+1} km: ${fmtT(s)}`}).join(', ');
  const txt=['Bieżnia '+d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' ('+(dev?.name||'bieżnia')+')',
- 'Buty: '+shoes,'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
+ 'Buty: '+shoes,'Trening: '+({easy:'spokojny',long:'długi',int:'interwały',free:'bez limitu'}[plan])+(LIMIT?' (limit tętna '+LIMIT+')':''),'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
  'Średnie tempo: '+(km>0.05?fmtT(secs/km)+' /km':'–'),'Maks. prędkość: '+nf(S.maxSpd,1)+' km/h',
  'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno: '+(S.hrN?Math.round(S.hrSum/S.hrN):'–')+(S.hrMax?' (maks. '+S.hrMax+')':''),
  S.zoneSecs.some(x=>x)?'Strefy: '+S.zoneSecs.map((z,i)=>'Z'+(i+1)+' '+fmtT(z)).join(', '):'',
