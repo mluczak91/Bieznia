@@ -268,15 +268,13 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function showErr(t){$('err').textContent=t;$('err').hidden=!t}
 
 $('conn').onclick=async()=>{
- showErr('');unlockAudio();
+ showErr('');unlockAudio();userStop=false;
  if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth. Otwórz plik w Chrome na Androidzie.');return}
  try{
   $('st').textContent='Szukam bieżni…';
   dev=await navigator.bluetooth.requestDevice({filters:[{services:['fitness_machine']}]});
-  dev.addEventListener('gattserverdisconnected',()=>{$('st').innerHTML='<b>Rozłączono</b>, kliknij „Połącz” ponownie';$('conn').disabled=false;cp=null;$('ctl').hidden=true;$('probe').disabled=true});
-  srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
-  const ch=await srv.getCharacteristic('treadmill_data');
-  await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData);
+  dev.addEventListener('gattserverdisconnected',onTmLost);
+  await subTreadmill();
   if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkAlarm();checkSplit();render();drawChart($('live'),S.prof)},1000)}
   $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
   $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
@@ -322,24 +320,46 @@ $('sDn').onclick=()=>{if(S.spd<1)return;setSpeed(-0.5)};
 $('iUp').onclick=()=>setInc(0.5);
 $('iDn').onclick=()=>setInc(-0.5);
 
+/* ---------- automatyczne ponowne łączenie ---------- */
+let userStop=false,tmTry=0,hrTry=0,tmTimer=null,hrTimer=null;
+async function subTreadmill(){srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
+ const ch=await srv.getCharacteristic('treadmill_data');await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData)}
+async function subHr(){const ch=await (await (await hrDev.gatt.connect()).getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
+ await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onHr)}
+function onTmLost(){cp=null;$('ctl').hidden=true;$('probe').disabled=true;lastTs=0;
+ if(userStop||$('stop').disabled){$('st').textContent='Rozłączono';$('conn').disabled=false;return}
+ $('st').innerHTML='<b>Łączę ponownie z bieżnią…</b>';tmTry=0;retryTm()}
+async function retryTm(){clearTimeout(tmTimer);if(userStop||$('stop').disabled||dev?.gatt?.connected)return;
+ tmTry++;try{await subTreadmill();$('st').innerHTML='Połączono ponownie: <b>'+(dev.name||'bieżnia')+'</b>';$('probe').disabled=false;lockScreen()}
+ catch(e){if(tmTry<40){$('st').innerHTML='<b>Łączę ponownie z bieżnią…</b> (próba '+tmTry+')';tmTimer=setTimeout(retryTm,3000)}
+  else{$('st').innerHTML='<b>Rozłączono</b>, kliknij „Połącz” ponownie';$('conn').disabled=false}}}
+function onHrLost(){S.hrLive=false;if(userStop){$('hrSt').textContent='Tętno rozłączone';$('hrBtn').disabled=false;return}
+ $('hrSt').innerHTML='<b>Łączę ponownie z pasem…</b>';hrTry=0;retryHr()}
+async function retryHr(){clearTimeout(hrTimer);if(userStop||hrDev?.gatt?.connected)return;
+ hrTry++;try{await subHr();$('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b> (połączono ponownie)'}
+ catch(e){if(hrTry<40){$('hrSt').innerHTML='<b>Łączę ponownie z pasem…</b> (próba '+hrTry+')';hrTimer=setTimeout(retryHr,3000)}
+  else{$('hrSt').innerHTML='<b>Tętno rozłączone</b>, kliknij ponownie';$('hrBtn').disabled=false}}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;
+ if(dev&&!dev.gatt.connected&&!$('stop').disabled&&!userStop){tmTry=0;retryTm()}
+ if(hrDev&&!hrDev.gatt.connected&&!userStop){hrTry=0;retryHr()}});
+
 /* ---------- tętno (Heart Rate Service 0x180D) ---------- */
 let hrDev=null;
 function onHr(e){const v=e.target.value,f=v.getUint8(0);const hr=(f&1)?v.getUint16(1,true):v.getUint8(1);if(!hr)return;
  S.hrLive=true;S.hr=hr;S.hrMax=Math.max(S.hrMax,hr);if(!$('stop').disabled){S.hrSum+=hr;S.hrN++}render()}
 $('hrBtn').onclick=async()=>{
- showErr('');unlockAudio();if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
+ showErr('');unlockAudio();userStop=false;if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
  try{$('hrSt').textContent='Szukam pulsometru…';
   hrDev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
-  hrDev.addEventListener('gattserverdisconnected',()=>{S.hrLive=false;$('hrSt').innerHTML='<b>Tętno rozłączone</b>, kliknij ponownie';$('hrBtn').disabled=false});
-  const ch=await (await (await hrDev.gatt.connect()).getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
-  await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onHr);
+  hrDev.addEventListener('gattserverdisconnected',onHrLost);
+  await subHr();
   $('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b>';$('hrBtn').disabled=true;
  }catch(e){$('hrSt').textContent=e.name==='NotFoundError'?'Nie znaleziono pulsometru. Włącz w zegarku udostępnianie tętna (czasem nazywa się „HR broadcast”) albo użyj pasa na klatkę.':'Błąd tętna: '+e.message}
 };
 
 /* ---------- koniec biegu, historia ---------- */
 $('stop').onclick=()=>{
- clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
+ userStop=true;clearTimeout(tmTimer);clearTimeout(hrTimer);clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
  let acc=0;const sp=S.splits.map((s,i)=>{acc+=s;return `${i+1} km: ${fmtT(s)}`}).join(', ');
  const txt=['Bieżnia '+d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' ('+(dev?.name||'bieżnia')+')',
