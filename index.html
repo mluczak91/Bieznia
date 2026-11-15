@@ -88,6 +88,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="btns shoes" id="plans">
  <button data-p="easy">Spokojny &lt; 135</button><button data-p="long">Długi &lt; 140</button><button data-p="int">Interwały</button><button data-p="free">Bez limitu</button>
 </div>
+<div class="btns shoes"><button id="voiceBtn">🗣️ Głos co km: wył.</button><button id="voiceTest">Test głosu</button></div>
 <div class="lim"><label for="limIn">Alarm tętna powyżej</label><input id="limIn" type="number" inputmode="numeric" min="100" max="200"><span>· dźwięk + wibracja po 10 s nad limitem</span></div>
 <div class="alarm" id="alarm" hidden></div>
 
@@ -186,7 +187,7 @@ function onData(e){
 }
 function checkSplit(){
  const km=Math.floor(curDist()/1000);
- while(S.splits.length<km){const t=curSecs();S.splits.push(t-S.lastSplitT);S.lastSplitT=t;renderSplits()}
+ while(S.splits.length<km){const t=curSecs();S.splits.push(t-S.lastSplitT);S.lastSplitT=t;renderSplits();announceKm(S.splits.length,S.splits[S.splits.length-1])}
 }
 function splitRows(sp){
  const best=Math.min(...sp),worst=Math.max(...sp);let acc=0;
@@ -216,6 +217,22 @@ $('pocket').addEventListener('pointerdown',e=>{e.preventDefault();holdStart=Date
 ['pointerup','pointercancel','pointerleave'].forEach(t=>$('pocket').addEventListener(t,holdEnd));
 $('pocket').addEventListener('contextmenu',e=>e.preventDefault());
 function renderPocket(){if($('pocket').hidden)return;$('pHr').textContent=S.hr?('♥ '+S.hr):'♥ –';$('pKm').textContent=nf(curDist()/1000,2)+' km · '+fmtT(curSecs())}
+
+/* ---------- głos co kilometr ---------- */
+let VOICE=store.get('glos',true);
+function voiceUi(){$('voiceBtn').textContent='🗣️ Głos co km: '+(VOICE?'wł.':'wył.');$('voiceBtn').classList.toggle('on',VOICE)}
+$('voiceBtn').onclick=()=>{VOICE=!VOICE;store.set('glos',VOICE);voiceUi();if(VOICE)say('Głos włączony')};voiceUi();
+function plVoice(){const v=speechSynthesis.getVoices();return v.find(x=>/^pl/i.test(x.lang))||null}
+function say(t){try{if(!('speechSynthesis' in window))return;const u=new SpeechSynthesisUtterance(t);u.lang='pl-PL';const v=plVoice();if(v)u.voice=v;u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+try{speechSynthesis.onvoiceschanged=()=>{}}catch(e){}
+const ORD=['','pierwszy','drugi','trzeci','czwarty','piąty','szósty','siódmy','ósmy','dziewiąty','dziesiąty','jedenasty','dwunasty','trzynasty','czternasty','piętnasty','szesnasty','siedemnasty','osiemnasty','dziewiętnasty','dwudziesty','dwudziesty pierwszy','dwudziesty drugi'];
+function paceWords(sec){sec=Math.round(sec);const m=Math.floor(sec/60),x=sec%60;return m+' '+(x<10?'zero '+x:x)}
+function announceKm(n,splitSec){if(!VOICE)return;
+ let t='Kilometr '+(ORD[n]||n)+'. Tempo '+paceWords(splitSec)+'.';
+ if(S.hrLive&&S.hr)t+=' Tętno '+S.hr+'.';
+ if(S.splits.length>1){const prev=S.splits[S.splits.length-2],d=Math.round(splitSec-prev);if(Math.abs(d)>=5)t+=d<0?' Szybciej o '+(-d)+' sekund.':' Wolniej o '+d+' sekund.'}
+ say(t)}
+$('voiceTest').onclick=()=>say('Kilometr piąty. Tempo 5 58. Tętno 138. Szybciej o 6 sekund.');
 
 /* ---------- alarm tętna ---------- */
 const PLANS={easy:135,long:140,int:172,free:0};
