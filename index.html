@@ -9,9 +9,9 @@
 <link rel="icon" href="icon-192.png">
 <style>
 /* Jeden ekran: licznik, kafle, sterowanie, odcinki, historia */
-:root{--bg:#f3f5f7;--card:#ffffff;--fg:#14181d;--mut:#5c6772;--acc:#d6452b;--ok:#1f8a4c;--line:#dfe3e8;
+:root{--bg:#f3f5f7;--card:#ffffff;--fg:#14181d;--mut:#5c6772;--acc:#d6452b;--ok:#1f8a4c;--line:#dfe3e8;--hr:#c2185b;
 --display:"Space Grotesk",system-ui,sans-serif;--body:Inter,system-ui,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1215;--card:#181c21;--fg:#eef1f4;--mut:#93a0ad;--acc:#ff6a4d;--ok:#4cc27e;--line:#2a3038;color-scheme:dark}}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1215;--card:#181c21;--fg:#eef1f4;--mut:#93a0ad;--acc:#ff6a4d;--ok:#4cc27e;--line:#2a3038;--hr:#ff5c9a;color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--body);padding-block:16px 24px;
@@ -81,6 +81,8 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
  <button class="p" id="conn">Połącz z bieżnią</button>
  <button id="stop" disabled>Zakończ bieg</button>
 </div>
+<div class="btns"><button id="hrBtn">❤️ Połącz tętno</button></div>
+<div class="st" id="hrSt">Zegarek albo pas na klatkę z Bluetooth (standard Heart Rate).</div>
 <div class="err" id="err" hidden></div>
 
 <h2>Sterowanie</h2>
@@ -96,7 +98,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 
 <h2>Prędkość i nachylenie</h2>
 <div class="chart"><canvas id="live" aria-label="Wykres prędkości i nachylenia w czasie"></canvas>
-<div class="st"><span class="leg"><i style="background:var(--acc)"></i>prędkość km/h</span><span class="leg"><i style="background:var(--mut)"></i>nachylenie %</span></div></div>
+<div class="st"><span class="leg"><i style="background:var(--acc)"></i>prędkość km/h</span><span class="leg"><i style="background:var(--mut)"></i>nachylenie %</span><span class="leg"><i style="background:var(--hr)"></i>tętno</span></div></div>
 
 <pre id="sum" hidden></pre>
 <div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button></div>
@@ -122,7 +124,7 @@ let dev,srv,cp=null,lastTs=0,S=null,wake=null,tick=null,shoes=store.get('buty','
 function setShoes(s){shoes=s;store.set('buty',s);document.querySelectorAll('#shoes button').forEach(b=>b.classList.toggle('on',b.dataset.s===s))}
 document.querySelectorAll('#shoes button').forEach(b=>b.onclick=()=>setShoes(b.dataset.s));setShoes(shoes);
 
-function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[]}}
+function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[],hrMax:0}}
 const curDist=()=>S.dist??S.distInt, curSecs=()=>S.machineSecs??S.secs;
 
 function parse(dv){
@@ -148,7 +150,7 @@ function onData(e){
  if(r.dist!=null)S.dist=r.dist;
  if(r.inc!=null)S.inc=r.inc;
  if(r.kcal!=null)S.kcal=r.kcal;
- if(r.hr){S.hr=r.hr;S.hrSum+=r.hr;S.hrN++}
+ if(r.hr&&!S.hrLive){S.hr=r.hr;S.hrSum+=r.hr;S.hrN++}
  if(r.time!=null)S.machineSecs=r.time;
  checkSplit();render();
 }
@@ -178,6 +180,7 @@ function drawChart(cv,prof){
  if(prof.length<2){g.fillText('Wykres pojawi się po starcie biegu',L+8,T+ph/2);return}
  g.strokeStyle=cssv('--mut');g.setLineDash([4,4]);g.beginPath();prof.forEach((p,i)=>{const x=xt(p[0]),y=T+ph-ph*p[2]/iMax*0.5;i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();g.setLineDash([]);
  g.strokeStyle=cssv('--acc');g.lineWidth=2.5;g.beginPath();prof.forEach((p,i)=>{const x=xt(p[0]),y=T+ph-ph*p[1]/vMax;i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
+ if(prof.some(p=>p[3])){g.strokeStyle=cssv('--hr');g.lineWidth=1.5;g.beginPath();let st=false;prof.forEach(p=>{if(!p[3]){st=false;return}const x=xt(p[0]),y=T+ph-ph*Math.min(1,Math.max(0,(p[3]-60)/140));st?g.lineTo(x,y):g.moveTo(x,y);st=true});g.stroke();g.fillStyle=cssv('--hr');g.fillText('♥ 60–200',W-R-58,T+10)}
  const lp=prof[prof.length-1];g.fillStyle=cssv('--acc');g.beginPath();g.arc(xt(lp[0]),T+ph-ph*lp[1]/vMax,4,0,7);g.fill();
 }
 function render(){
@@ -205,7 +208,7 @@ $('conn').onclick=async()=>{
   srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
   const ch=await srv.getCharacteristic('treadmill_data');
   await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData);
-  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10]);checkSplit();render();drawChart($('live'),S.prof)},1000)}
+  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);checkSplit();render();drawChart($('live'),S.prof)},1000)}
   $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
   $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
  }catch(e){$('st').textContent='Nie połączono';showErr(e.name==='NotFoundError'?'Nie wybrano bieżni albo żadnej nie znaleziono. Włącz bieżnię i spróbuj jeszcze raz.':(e.name==='SecurityError'?'Przeglądarka blokuje Bluetooth na tej stronie.':'Błąd: '+e.message))}
@@ -250,15 +253,30 @@ $('sDn').onclick=()=>{if(S.spd<1)return;setSpeed(-0.5)};
 $('iUp').onclick=()=>setInc(0.5);
 $('iDn').onclick=()=>setInc(-0.5);
 
+/* ---------- tętno (Heart Rate Service 0x180D) ---------- */
+let hrDev=null;
+function onHr(e){const v=e.target.value,f=v.getUint8(0);const hr=(f&1)?v.getUint16(1,true):v.getUint8(1);if(!hr)return;
+ S.hrLive=true;S.hr=hr;S.hrMax=Math.max(S.hrMax,hr);if(!$('stop').disabled){S.hrSum+=hr;S.hrN++}render()}
+$('hrBtn').onclick=async()=>{
+ showErr('');if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
+ try{$('hrSt').textContent='Szukam pulsometru…';
+  hrDev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
+  hrDev.addEventListener('gattserverdisconnected',()=>{S.hrLive=false;$('hrSt').innerHTML='<b>Tętno rozłączone</b>, kliknij ponownie';$('hrBtn').disabled=false});
+  const ch=await (await (await hrDev.gatt.connect()).getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
+  await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onHr);
+  $('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b>';$('hrBtn').disabled=true;
+ }catch(e){$('hrSt').textContent=e.name==='NotFoundError'?'Nie znaleziono pulsometru. Włącz w zegarku udostępnianie tętna (czasem nazywa się „HR broadcast”) albo użyj pasa na klatkę.':'Błąd tętna: '+e.message}
+};
+
 /* ---------- koniec biegu, historia ---------- */
 $('stop').onclick=()=>{
- clearInterval(tick);try{dev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
+ clearInterval(tick);try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
  let acc=0;const sp=S.splits.map((s,i)=>{acc+=s;return `${i+1} km: ${fmtT(s)}`}).join(', ');
  const txt=['Bieżnia '+d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' ('+(dev?.name||'bieżnia')+')',
  'Buty: '+shoes,'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
  'Średnie tempo: '+(km>0.05?fmtT(secs/km)+' /km':'–'),'Maks. prędkość: '+nf(S.maxSpd,1)+' km/h',
- 'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno (bieżnia): '+(S.hrN?Math.round(S.hrSum/S.hrN):'–'),
+ 'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno: '+(S.hrN?Math.round(S.hrSum/S.hrN):'–')+(S.hrMax?' (maks. '+S.hrMax+')':''),
  sp?'Odcinki: '+sp:''].filter(Boolean).join('\n');
  $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
  $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;
