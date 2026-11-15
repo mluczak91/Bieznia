@@ -53,6 +53,13 @@ details{margin-top:8px}
 .chart{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px}
 .chart canvas{width:100%;height:160px;display:block}
 .chart .st{display:flex;gap:14px;flex-wrap:wrap}
+.zr{display:grid;grid-template-columns:28px 64px 1fr 52px 36px;gap:8px;align-items:center;font-size:13px;font-variant-numeric:tabular-nums;padding:4px 0}
+.zr .zb{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.zr .zb i{display:block;height:100%;border-radius:5px}
+.zr.now{font-weight:700}
+.hrz{font:600 13px var(--body);padding:2px 8px;border-radius:999px;color:#fff;margin-left:6px;vertical-align:middle}
+.zset{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--mut)}
+.zset input{width:72px;font:600 15px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 .leg{display:inline-flex;align-items:center;gap:6px}
 .leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 summary{cursor:pointer;color:var(--mut);font-size:14px}
@@ -74,7 +81,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
  <div class="t"><div class="l">Prędkość km/h</div><div class="v" id="spd">0,0</div></div>
  <div class="t"><div class="l">Nachylenie %</div><div class="v" id="inc">0,0</div></div>
  <div class="t"><div class="l">Kcal (bieżnia)</div><div class="v" id="kcal">–</div></div>
- <div class="t"><div class="l">Tętno</div><div class="v" id="hr">–</div></div>
+ <div class="t"><div class="l">Tętno</div><div class="v"><span id="hr">–</span><span class="hrz" id="hrz" hidden></span></div></div>
 </div>
 
 <div class="btns">
@@ -103,6 +110,10 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <pre id="sum" hidden></pre>
 <div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button></div>
 
+<h2>Strefy tętna</h2>
+<div class="chart" id="zones"></div>
+<div class="zset"><label for="hrMaxIn">Tętno maks.</label><input id="hrMaxIn" type="number" inputmode="numeric" min="150" max="220"><span>strefy = 50/60/70/80/90% maks., jak w zegarku</span></div>
+
 <h2>Historia</h2>
 <div id="hist" class="st">Brak zapisanych biegów.</div>
 <div class="btns">
@@ -124,7 +135,7 @@ let dev,srv,cp=null,lastTs=0,S=null,wake=null,tick=null,shoes=store.get('buty','
 function setShoes(s){shoes=s;store.set('buty',s);document.querySelectorAll('#shoes button').forEach(b=>b.classList.toggle('on',b.dataset.s===s))}
 document.querySelectorAll('#shoes button').forEach(b=>b.onclick=()=>setShoes(b.dataset.s));setShoes(shoes);
 
-function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[],hrMax:0}}
+function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[],hrMax:0,zoneSecs:[0,0,0,0,0]}}
 const curDist=()=>S.dist??S.distInt, curSecs=()=>S.machineSecs??S.secs;
 
 function parse(dv){
@@ -167,6 +178,14 @@ function renderSplits(){
  if(!S.splits.length){$('splits').innerHTML='<tr><td colspan="4" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr>';return}
  $('splits').innerHTML=splitRows(S.splits);
 }
+const ZCOL=['#7aa7c7','#2bb3a3','#4cc27e','#f0a43a','#e5484d'];
+let HRMAX=store.get('hrMax',185);
+const zoneB=()=>[0.5,0.6,0.7,0.8,0.9,1].map(f=>Math.round(HRMAX*f));
+function zoneOf(hr){const b=zoneB();for(let i=4;i>=0;i--)if(hr>=b[i])return i;return -1}
+function zoneHtml(zs,cur){const b=zoneB(),tot=zs.reduce((a,c)=>a+c,0)||1;
+ return [4,3,2,1,0].map(i=>`<div class="zr${cur===i?' now':''}"><span style="color:${ZCOL[i]}">Z${i+1}</span><span class="st">${b[i]}–${b[i+1]}</span><span class="zb"><i style="width:${(zs[i]/tot*100).toFixed(0)}%;background:${ZCOL[i]}"></i></span><span>${fmtT(zs[i])}</span><span class="st">${Math.round(zs[i]/tot*100)}%</span></div>`).join('')}
+function renderZones(){$('zones').innerHTML=zoneHtml(S.zoneSecs,S.hrLive&&S.hr?zoneOf(S.hr):-1)}
+$('hrMaxIn').value=HRMAX;$('hrMaxIn').onchange=e=>{const v=+e.target.value;if(v>=150&&v<=220){HRMAX=v;store.set('hrMax',v);renderZones()}else e.target.value=HRMAX};
 function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 function drawChart(cv,prof){
  if(!cv)return;const dpr=window.devicePixelRatio||1,W=cv.clientWidth||300,H=cv.clientHeight||160;
@@ -192,7 +211,7 @@ function render(){
  $('pace').textContent=S.spd>1?fmtT(3600/S.spd):'–:–';
  $('inc').textContent=nf(S.inc,1);
  $('kcal').textContent=S.kcal!=null?S.kcal:'–';
- $('hr').textContent=S.hr??'–';
+ $('hr').textContent=S.hr??'–';{const z=S.hr?zoneOf(S.hr):-1;const e=$('hrz');if(z>=0){e.hidden=false;e.textContent='Z'+(z+1);e.style.background=ZCOL[z]}else e.hidden=true}renderZones();
 }
 async function lockScreen(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S&&!$('stop').disabled)lockScreen()});
@@ -208,7 +227,7 @@ $('conn').onclick=async()=>{
   srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
   const ch=await srv.getCharacteristic('treadmill_data');
   await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData);
-  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);checkSplit();render();drawChart($('live'),S.prof)},1000)}
+  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkSplit();render();drawChart($('live'),S.prof)},1000)}
   $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
   $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
  }catch(e){$('st').textContent='Nie połączono';showErr(e.name==='NotFoundError'?'Nie wybrano bieżni albo żadnej nie znaleziono. Włącz bieżnię i spróbuj jeszcze raz.':(e.name==='SecurityError'?'Przeglądarka blokuje Bluetooth na tej stronie.':'Błąd: '+e.message))}
@@ -277,11 +296,12 @@ $('stop').onclick=()=>{
  'Buty: '+shoes,'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
  'Średnie tempo: '+(km>0.05?fmtT(secs/km)+' /km':'–'),'Maks. prędkość: '+nf(S.maxSpd,1)+' km/h',
  'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno: '+(S.hrN?Math.round(S.hrSum/S.hrN):'–')+(S.hrMax?' (maks. '+S.hrMax+')':''),
+ S.zoneSecs.some(x=>x)?'Strefy: '+S.zoneSecs.map((z,i)=>'Z'+(i+1)+' '+fmtT(z)).join(', '):'',
  sp?'Odcinki: '+sp:''].filter(Boolean).join('\n');
  $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
  $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;
  $('st').textContent='Bieg zakończony';
- if(km>0.05){const h=store.get('historia',[]);h.unshift({txt,km,secs,shoes,date:S.start,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)});store.set('historia',h);exportHist(true)}
+ if(km>0.05){const h=store.get('historia',[]);h.unshift({txt,km,secs,shoes,date:S.start,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)});store.set('historia',h);exportHist(true)}
  renderHist();
 };
 /* ---------- kopie zapasowe: plik JSON w Pobranych ---------- */
@@ -316,6 +336,7 @@ function renderHist(){
   const p=document.createElement('pre');p.textContent=x.txt;d.append(s);
   if(x.splits&&x.splits.length){const t=document.createElement('table');t.className='sp';t.style.marginTop='10px';t.innerHTML='<thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody>'+splitRows(x.splits)+'</tbody>';d.append(t)}
   if(x.prof&&x.prof.length>1){const c=document.createElement('div');c.className='chart';const cv=document.createElement('canvas');c.append(cv);d.append(c);d.addEventListener('toggle',()=>{if(d.open)drawChart(cv,x.prof)})}
+  if(x.zones&&x.zones.some(v=>v)){const z=document.createElement('div');z.className='chart';z.innerHTML=zoneHtml(x.zones,-1);d.append(z)}
   d.append(p);$('hist').append(d)});
 }
 reset();render();renderHist();drawChart($('live'),[]);addEventListener('resize',()=>drawChart($('live'),S.prof));
