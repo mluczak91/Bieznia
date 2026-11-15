@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bieżnia Marcina</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#d6452b">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Jeden ekran: licznik, kafle, sterowanie, odcinki, historia */
+:root{--bg:#f3f5f7;--card:#ffffff;--fg:#14181d;--mut:#5c6772;--acc:#d6452b;--ok:#1f8a4c;--line:#dfe3e8;
+--display:"Space Grotesk",system-ui,sans-serif;--body:Inter,system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1215;--card:#181c21;--fg:#eef1f4;--mut:#93a0ad;--acc:#ff6a4d;--ok:#4cc27e;--line:#2a3038;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--body);padding-block:16px 24px;
+padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font:600 20px var(--display);margin:0}
+h2{font:600 15px var(--display);margin:18px 0 8px;color:var(--mut);letter-spacing:.04em;text-transform:uppercase}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.st{font-size:13px;color:var(--mut)}
+.st b{color:var(--fg)}
+.big{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;display:grid;gap:4px}
+.big .v{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums}
+.l{color:var(--mut);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.t{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.t .v{font:600 28px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+button{font:600 16px var(--body);border-radius:12px;padding:14px 16px;border:1px solid var(--line);background:var(--card);color:var(--fg);flex:1 1 120px;cursor:pointer}
+button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button:disabled{opacity:.4}
+.shoes button{padding:10px 12px;font-size:14px}
+.ctl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ctl .t{display:grid;gap:8px}
+.ctl .row{display:flex;gap:8px}
+.ctl .row button{padding:12px 0;font-size:22px}
+pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;margin:10px 0 0;min-width:0}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+td,th{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+th{color:var(--mut);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.err{color:var(--acc);font-size:14px;margin-top:10px}
+.note{color:var(--mut);font-size:12px;margin-top:14px}
+.ok{color:var(--ok)}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<div class="top"><h1>Bieżnia Marcina</h1><div class="st" id="st">Nie połączono</div></div>
+
+<h2>Buty</h2>
+<div class="btns shoes" id="shoes">
+ <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Inne">Inne</button>
+</div>
+
+<div class="big"><span class="l">Dystans z bieżni</span><span class="v" id="dist">0,00 km</span><span class="st" id="dist2">Z prędkości: 0,00 km</span></div>
+
+<div class="grid">
+ <div class="t"><div class="l">Czas</div><div class="v" id="time">0:00</div></div>
+ <div class="t"><div class="l">Tempo</div><div class="v" id="pace">–:–</div></div>
+ <div class="t"><div class="l">Prędkość km/h</div><div class="v" id="spd">0,0</div></div>
+ <div class="t"><div class="l">Nachylenie %</div><div class="v" id="inc">0,0</div></div>
+ <div class="t"><div class="l">Kcal (bieżnia)</div><div class="v" id="kcal">–</div></div>
+ <div class="t"><div class="l">Tętno</div><div class="v" id="hr">–</div></div>
+</div>
+
+<div class="btns">
+ <button class="p" id="conn">Połącz z bieżnią</button>
+ <button id="stop" disabled>Zakończ bieg</button>
+</div>
+<div class="err" id="err" hidden></div>
+
+<h2>Sterowanie</h2>
+<div class="st" id="ctlInfo">Połącz się, a potem kliknij „Sprawdź sterowanie”. Taśmę zawsze uruchamiasz na bieżni.</div>
+<div class="btns"><button id="probe" disabled>Sprawdź sterowanie</button></div>
+<div class="ctl" id="ctl" hidden>
+ <div class="t"><div class="l">Prędkość</div><div class="row"><button id="sDn" aria-label="Wolniej">−</button><button id="sUp" aria-label="Szybciej">+</button></div><div class="st">krok 0,5 km/h, maks. 16</div></div>
+ <div class="t"><div class="l">Nachylenie</div><div class="row"><button id="iDn" aria-label="Mniejsze nachylenie">−</button><button id="iUp" aria-label="Większe nachylenie">+</button></div><div class="st">krok 0,5%, 0–12%</div></div>
+</div>
+
+<h2>Odcinki co 1 km</h2>
+<table><thead><tr><th>km</th><th>Czas</th><th>Tempo</th></tr></thead><tbody id="splits"><tr><td colspan="3" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr></tbody></table>
+
+<pre id="sum" hidden></pre>
+<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button></div>
+
+<h2>Historia</h2>
+<div id="hist" class="st">Brak zapisanych biegów.</div>
+<div class="btns">
+ <button id="exp">Zapisz kopię historii</button>
+ <button id="imp">Wczytaj kopię</button>
+ <input type="file" id="impFile" accept=".json,application/json" hidden>
+</div>
+<div class="st" id="bkInfo"></div>
+
+<p class="note">Telefon trzymaj przy bieżni, ekran nie gaśnie w trakcie biegu. Wybierz bieżnię, na której stoisz: najmocniejszy sygnał, numer z listy. Klips bezpieczeństwa zawsze podpięty.</p>
+
+<script>
+const $=id=>document.getElementById(id);
+const nf=(v,d)=>v.toLocaleString('pl-PL',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtT=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let dev,srv,cp=null,lastTs=0,S=null,wake=null,tick=null,shoes=store.get('buty','Kiprun'),cpWait=null;
+
+function setShoes(s){shoes=s;store.set('buty',s);document.querySelectorAll('#shoes button').forEach(b=>b.classList.toggle('on',b.dataset.s===s))}
+document.querySelectorAll('#shoes button').forEach(b=>b.onclick=()=>setShoes(b.dataset.s));setShoes(shoes);
+
+function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0}}
+const curDist=()=>S.dist??S.distInt, curSecs=()=>S.machineSecs??S.secs;
+
+function parse(dv){
+ let o=0;const f=dv.getUint16(o,true);o+=2;const r={};
+ if(!(f&1)){r.spd=dv.getUint16(o,true)/100;o+=2}
+ if(f&2){o+=2}
+ if(f&4){r.dist=dv.getUint8(o)|(dv.getUint8(o+1)<<8)|(dv.getUint8(o+2)<<16);o+=3}
+ if(f&8){r.inc=dv.getInt16(o,true)/10;o+=4}
+ if(f&16){o+=4}
+ if(f&32){o+=1}
+ if(f&64){o+=1}
+ if(f&128){const k=dv.getUint16(o,true);if(k!==0xFFFF)r.kcal=k;o+=5}
+ if(f&256){r.hr=dv.getUint8(o);o+=1}
+ if(f&512){o+=1}
+ if(f&1024){r.time=dv.getUint16(o,true);o+=2}
+ return r;
+}
+function onData(e){
+ let r;try{r=parse(e.target.value)}catch(x){return}
+ const now=performance.now();
+ if(r.spd!=null){if(lastTs&&r.spd>0)S.distInt+=r.spd/3.6*(now-lastTs)/1000;S.spd=r.spd;S.maxSpd=Math.max(S.maxSpd,r.spd)}
+ lastTs=now;
+ if(r.dist!=null)S.dist=r.dist;
+ if(r.inc!=null)S.inc=r.inc;
+ if(r.kcal!=null)S.kcal=r.kcal;
+ if(r.hr){S.hr=r.hr;S.hrSum+=r.hr;S.hrN++}
+ if(r.time!=null)S.machineSecs=r.time;
+ checkSplit();render();
+}
+function checkSplit(){
+ const km=Math.floor(curDist()/1000);
+ while(S.splits.length<km){const t=curSecs();S.splits.push(t-S.lastSplitT);S.lastSplitT=t;renderSplits()}
+}
+function renderSplits(){
+ if(!S.splits.length){$('splits').innerHTML='<tr><td colspan="3" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr>';return}
+ let acc=0;$('splits').innerHTML=S.splits.map((s,i)=>{acc+=s;return `<tr><td>${i+1}</td><td>${fmtT(acc)}</td><td>${fmtT(s)} /km</td></tr>`}).join('');
+}
+function render(){
+ const km=curDist()/1000;
+ $('dist').textContent=nf(km,2)+' km';
+ $('dist2').textContent='Z prędkości: '+nf(S.distInt/1000,2)+' km'+(S.dist==null?' (bieżnia nie podaje dystansu)':'');
+ $('time').textContent=fmtT(curSecs());
+ $('spd').textContent=nf(S.spd,1);
+ $('pace').textContent=S.spd>1?fmtT(3600/S.spd):'–:–';
+ $('inc').textContent=nf(S.inc,1);
+ $('kcal').textContent=S.kcal!=null?S.kcal:'–';
+ $('hr').textContent=S.hr??'–';
+}
+async function lockScreen(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S&&!$('stop').disabled)lockScreen()});
+function showErr(t){$('err').textContent=t;$('err').hidden=!t}
+
+$('conn').onclick=async()=>{
+ showErr('');
+ if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth. Otwórz plik w Chrome na Androidzie.');return}
+ try{
+  $('st').textContent='Szukam bieżni…';
+  dev=await navigator.bluetooth.requestDevice({filters:[{services:['fitness_machine']}]});
+  dev.addEventListener('gattserverdisconnected',()=>{$('st').innerHTML='<b>Rozłączono</b>, kliknij „Połącz” ponownie';$('conn').disabled=false;cp=null;$('ctl').hidden=true;$('probe').disabled=true});
+  srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
+  const ch=await srv.getCharacteristic('treadmill_data');
+  await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData);
+  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;checkSplit();render()},1000)}
+  $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
+  $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
+ }catch(e){$('st').textContent='Nie połączono';showErr(e.name==='NotFoundError'?'Nie wybrano bieżni albo żadnej nie znaleziono. Włącz bieżnię i spróbuj jeszcze raz.':(e.name==='SecurityError'?'Przeglądarka blokuje Bluetooth na tej stronie.':'Błąd: '+e.message))}
+};
+
+/* ---------- sterowanie (FTMS Control Point) ---------- */
+const RES={1:'OK',2:'nieobsługiwane',3:'zły parametr',4:'nie udało się',5:'brak zgody bieżni'};
+function cpSend(bytes){
+ return new Promise(async(res)=>{
+  const op=bytes[0];const timer=setTimeout(()=>{cpWait=null;res({code:0,txt:'brak odpowiedzi'})},3000);
+  cpWait={op,done:(code)=>{clearTimeout(timer);cpWait=null;res({code,txt:RES[code]||('kod '+code)})}};
+  try{await cp.writeValueWithResponse(new Uint8Array(bytes))}catch(e){clearTimeout(timer);cpWait=null;res({code:-1,txt:e.message})}
+ });
+}
+function onCp(e){const v=e.target.value;if(v.getUint8(0)===0x80&&cpWait&&v.getUint8(1)===cpWait.op)cpWait.done(v.getUint8(2))}
+$('probe').onclick=async()=>{
+ const info=[];$('ctlInfo').textContent='Sprawdzam…';
+ try{
+  try{const ft=await (await srv.getCharacteristic('fitness_machine_feature')).readValue();const tf=ft.getUint32(4,true);
+   info.push('Bieżnia deklaruje: prędkość '+((tf&1)?'TAK':'nie')+', nachylenie '+((tf&2)?'TAK':'nie')+'.')}catch(e){info.push('Nie udało się odczytać możliwości.')}
+  cp=await srv.getCharacteristic('fitness_machine_control_point');
+  await cp.startNotifications();cp.addEventListener('characteristicvaluechanged',onCp);
+  const r=await cpSend([0x00]);
+  info.push('Przejęcie sterowania: '+r.txt+'.');
+  if(r.code===1){$('ctl').hidden=false;info.push('Sterowanie odblokowane. Zmiany idą małymi krokami.')}
+  else info.push('Sterowanie niedostępne, odczyt działa dalej normalnie.');
+ }catch(e){info.push('Bieżnia nie udostępnia sterowania ('+e.message+').')}
+ $('ctlInfo').innerHTML=info.join('<br>');
+};
+async function setSpeed(d){
+ const v=Math.max(1,Math.min(16,Math.round((S.spd+d)*2)/2));
+ const r=await cpSend([0x02,...new Uint8Array(new Uint16Array([Math.round(v*100)]).buffer)]);
+ if(r.code!==1)showErr('Zmiana prędkości: '+r.txt);else showErr('');
+}
+async function setInc(d){
+ const v=Math.max(0,Math.min(12,Math.round((S.inc+d)*2)/2));
+ const r=await cpSend([0x03,...new Uint8Array(new Int16Array([Math.round(v*10)]).buffer)]);
+ if(r.code!==1)showErr('Zmiana nachylenia: '+r.txt);else showErr('');
+}
+$('sUp').onclick=()=>{if(S.spd<1){showErr('Najpierw uruchom taśmę na bieżni.');return}setSpeed(0.5)};
+$('sDn').onclick=()=>{if(S.spd<1)return;setSpeed(-0.5)};
+$('iUp').onclick=()=>setInc(0.5);
+$('iDn').onclick=()=>setInc(-0.5);
+
+/* ---------- koniec biegu, historia ---------- */
+$('stop').onclick=()=>{
+ clearInterval(tick);try{dev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
+ const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
+ let acc=0;const sp=S.splits.map((s,i)=>{acc+=s;return `${i+1} km: ${fmtT(s)}`}).join(', ');
+ const txt=['Bieżnia '+d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' ('+(dev?.name||'bieżnia')+')',
+ 'Buty: '+shoes,'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
+ 'Średnie tempo: '+(km>0.05?fmtT(secs/km)+' /km':'–'),'Maks. prędkość: '+nf(S.maxSpd,1)+' km/h',
+ 'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno (bieżnia): '+(S.hrN?Math.round(S.hrSum/S.hrN):'–'),
+ sp?'Odcinki: '+sp:''].filter(Boolean).join('\n');
+ $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
+ $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;
+ $('st').textContent='Bieg zakończony';
+ if(km>0.05){const h=store.get('historia',[]);h.unshift({txt,km,secs,shoes,date:S.start,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd});store.set('historia',h);exportHist(true)}
+ renderHist();
+};
+/* ---------- kopie zapasowe: plik JSON w Pobranych ---------- */
+function exportHist(auto){
+ const h=store.get('historia',[]);if(!h.length){$('bkInfo').textContent='Nie ma jeszcze czego zapisać.';return}
+ const d=new Date(),p=n=>String(n).padStart(2,'0');
+ const name='bieznia-historia-'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes())+'.json';
+ const blob=new Blob([JSON.stringify({app:'Bieżnia Marcina',wersja:3,zapisano:d.toISOString(),biegi:h},null,1)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();
+ setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+ store.set('ostatniaKopia',d.toISOString());
+ $('bkInfo').textContent=(auto?'Automatyczna kopia: ':'Kopia: ')+name+' ('+h.length+' biegów) w folderze Pobrane.';
+}
+$('exp').onclick=()=>exportHist(false);
+$('imp').onclick=()=>$('impFile').click();
+$('impFile').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{const j=JSON.parse(await f.text());const inc=Array.isArray(j)?j:j.biegi;if(!Array.isArray(inc))throw 0;
+  const h=store.get('historia',[]);const seen=new Set(h.map(x=>x.date));let n=0;
+  inc.forEach(x=>{if(x&&x.date&&!seen.has(x.date)){h.push(x);seen.add(x.date);n++}});
+  h.sort((a,b)=>b.date-a.date);store.set('historia',h);renderHist();
+  $('bkInfo').textContent='Wczytano '+n+' nowych biegów (razem '+h.length+'). Duplikaty pominięte.';
+ }catch(x){$('bkInfo').textContent='To nie jest plik kopii z tej apki.'}
+ e.target.value='';
+};
+(()=>{const k=store.get('ostatniaKopia',null);if(k)$('bkInfo').textContent='Ostatnia kopia: '+new Date(k).toLocaleString('pl-PL')})();
+$('copy').onclick=async()=>{const t=$('sum').textContent;try{await navigator.clipboard.writeText(t);$('copy').textContent='Skopiowano'}catch(e){const r=document.createRange();r.selectNodeContents($('sum'));getSelection().removeAllRanges();getSelection().addRange(r)}};
+function renderHist(){
+ const h=store.get('historia',[]);if(!h.length){$('hist').textContent='Brak zapisanych biegów.';return}
+ $('hist').innerHTML='';h.slice(0,10).forEach(x=>{const d=document.createElement('details');const s=document.createElement('summary');
+  s.textContent=new Date(x.date).toLocaleDateString('pl-PL')+' · '+nf(x.km,2)+' km · '+fmtT(x.secs)+' · '+x.shoes;
+  const p=document.createElement('pre');p.textContent=x.txt;d.append(s,p);$('hist').append(d)});
+}
+reset();render();renderHist();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
