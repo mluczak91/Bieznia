@@ -149,7 +149,7 @@ function renderSplits(){
 function render(){
  const km=curDist()/1000;
  $('dist').textContent=nf(km,2)+' km';
- $('dist2').textContent='Z prędkości: '+nf(S.distInt/1000,2)+' km'+(S.dist==null?' (bieżnia nie podaje dystansu)':'');
+ $('dist2').textContent='Z prędkości: '+nf(S.distInt/1000,2)+' km'+(S.dist==null&&lastTs?' (bieżnia nie podaje dystansu)':'');
  $('time').textContent=fmtT(curSecs());
  $('spd').textContent=nf(S.spd,1);
  $('pace').textContent=S.spd>1?fmtT(3600/S.spd):'–:–';
