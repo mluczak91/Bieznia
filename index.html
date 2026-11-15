@@ -64,6 +64,13 @@ details{margin-top:8px}
  padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px))}
 .lim{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--mut)}
 .lim input{width:72px;font:600 15px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.pocket{position:fixed;inset:0;z-index:15;background:#000;color:#3a3a3a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pocket .ph{font:700 72px/1 var(--display);font-variant-numeric:tabular-nums}
+.pocket .pk{font:600 22px var(--display);font-variant-numeric:tabular-nums}
+.pocket .pt{font-size:13px;position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+.pocket .pr{width:120px;height:4px;border-radius:2px;background:#222;overflow:hidden}
+.pocket .pr i{display:block;height:100%;width:0;background:#555}
+.alarm{z-index:30}
 .leg{display:inline-flex;align-items:center;gap:6px}
 .leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 summary{cursor:pointer;color:var(--mut);font-size:14px}
@@ -99,7 +106,8 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
  <button class="p" id="conn">Połącz z bieżnią</button>
  <button id="stop" disabled>Zakończ bieg</button>
 </div>
-<div class="btns"><button id="hrBtn">❤️ Połącz tętno</button></div>
+<div class="btns"><button id="hrBtn">❤️ Połącz tętno</button><button id="pocketBtn">🌑 Tryb kieszeni</button></div>
+<div class="pocket" id="pocket" hidden><div class="ph" id="pHr">–</div><div class="pk" id="pKm">0,00 km</div><div class="pr"><i id="pProg"></i></div><div class="pt">Przytrzymaj ekran 2 sekundy, żeby wyjść</div></div>
 <div class="st" id="hrSt">Zegarek albo pas na klatkę z Bluetooth (standard Heart Rate).</div>
 <div class="err" id="err" hidden></div>
 
@@ -197,6 +205,18 @@ function zoneHtml(zs,cur){const b=zoneB(),tot=zs.reduce((a,c)=>a+c,0)||1;
  return [4,3,2,1,0].map(i=>`<div class="zr${cur===i?' now':''}"><span style="color:${ZCOL[i]}">Z${i+1}</span><span class="st">${b[i]}–${b[i+1]}</span><span class="zb"><i style="width:${(zs[i]/tot*100).toFixed(0)}%;background:${ZCOL[i]}"></i></span><span>${fmtT(zs[i])}</span><span class="st">${Math.round(zs[i]/tot*100)}%</span></div>`).join('')}
 function renderZones(){$('zones').innerHTML=zoneHtml(S.zoneSecs,S.hrLive&&S.hr?zoneOf(S.hr):-1)}
 $('hrMaxIn').value=HRMAX;$('hrMaxIn').onchange=e=>{const v=+e.target.value;if(v>=150&&v<=220){HRMAX=v;store.set('hrMax',v);renderZones()}else e.target.value=HRMAX};
+/* ---------- tryb kieszeni ---------- */
+let holdT=null,holdStart=0,holdAnim=null;
+$('pocketBtn').onclick=async()=>{unlockAudio();$('pocket').hidden=false;lockScreen();try{await document.documentElement.requestFullscreen?.({navigationUI:'hide'})}catch(e){}renderPocket()};
+function exitPocket(){$('pocket').hidden=true;try{document.fullscreenElement&&document.exitFullscreen()}catch(e){}}
+function holdEnd(){clearTimeout(holdT);cancelAnimationFrame(holdAnim);$('pProg').style.width='0'}
+$('pocket').addEventListener('pointerdown',e=>{e.preventDefault();holdStart=Date.now();
+ const step=()=>{$('pProg').style.width=Math.min(100,(Date.now()-holdStart)/20)+'%';holdAnim=requestAnimationFrame(step)};step();
+ holdT=setTimeout(()=>{holdEnd();exitPocket()},2000)});
+['pointerup','pointercancel','pointerleave'].forEach(t=>$('pocket').addEventListener(t,holdEnd));
+$('pocket').addEventListener('contextmenu',e=>e.preventDefault());
+function renderPocket(){if($('pocket').hidden)return;$('pHr').textContent=S.hr?('♥ '+S.hr):'♥ –';$('pKm').textContent=nf(curDist()/1000,2)+' km · '+fmtT(curSecs())}
+
 /* ---------- alarm tętna ---------- */
 const PLANS={easy:135,long:140,int:172,free:0};
 let plan=store.get('plan','easy'),LIMIT=store.get('limit',PLANS[plan]),overSince=0,lastBeep=0,ac=null,wasOver=false;
@@ -241,7 +261,7 @@ function render(){
  $('pace').textContent=S.spd>1?fmtT(3600/S.spd):'–:–';
  $('inc').textContent=nf(S.inc,1);
  $('kcal').textContent=S.kcal!=null?S.kcal:'–';
- $('hr').textContent=S.hr??'–';{const z=S.hr?zoneOf(S.hr):-1;const e=$('hrz');if(z>=0){e.hidden=false;e.textContent='Z'+(z+1);e.style.background=ZCOL[z]}else e.hidden=true}renderZones();
+ $('hr').textContent=S.hr??'–';renderPocket();{const z=S.hr?zoneOf(S.hr):-1;const e=$('hrz');if(z>=0){e.hidden=false;e.textContent='Z'+(z+1);e.style.background=ZCOL[z]}else e.hidden=true}renderZones();
 }
 async function lockScreen(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S&&!$('stop').disabled)lockScreen()});
