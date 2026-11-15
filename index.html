@@ -71,6 +71,18 @@ details{margin-top:8px}
 .pocket .pr{width:120px;height:4px;border-radius:2px;background:#222;overflow:hidden}
 .pocket .pr i{display:block;height:100%;width:0;background:#555}
 .alarm{z-index:30}
+.goal{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:8px}
+.goal i{display:block;height:100%;width:0;background:var(--ok);transition:width .5s}
+.set{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:13px;color:var(--mut)}
+.set label{display:flex;gap:6px;align-items:center}
+.set input{width:70px;font:600 15px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.ipanel{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:14px;margin-top:10px;display:grid;gap:4px;text-align:center}
+.ipanel.work{border-color:var(--acc)}.ipanel.rest{border-color:var(--ok)}
+.ipanel .ph{font:700 22px var(--display)}.ipanel .pv{font:700 48px/1 var(--display);font-variant-numeric:tabular-nums}
+.rec{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px;font-variant-numeric:tabular-nums}
+.rec b{font-weight:600}
+.warn{color:var(--acc);font-weight:600}
+@media (orientation:landscape) and (max-height:540px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.big .v{font-size:52px}}
 .leg{display:inline-flex;align-items:center;gap:6px}
 .leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 summary{cursor:pointer;color:var(--mut);font-size:14px}
@@ -81,8 +93,10 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 
 <h2>Buty</h2>
 <div class="btns shoes" id="shoes">
- <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Inne">Inne</button>
+ <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Reebok">Reebok</button><button data-s="Inne">Inne</button>
 </div>
+<div class="st" id="shoeKm" style="margin-top:8px"></div>
+<details><summary>Przebiegi butów sprzed apki</summary><div class="set" id="shoeBase"></div></details>
 
 <h2>Trening</h2>
 <div class="btns shoes" id="plans">
@@ -90,16 +104,27 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 </div>
 <div class="btns shoes"><button id="voiceBtn">🗣️ Głos co km: wył.</button><button id="voiceTest">Test głosu</button></div>
 <div class="lim"><label for="limIn">Alarm tętna powyżej</label><input id="limIn" type="number" inputmode="numeric" min="100" max="200"><span>· dźwięk + wibracja po 10 s nad limitem</span></div>
+<div class="set"><label for="goalIn">Cel km</label><input id="goalIn" type="number" inputmode="decimal" min="0" max="50" step="0.5"><label for="kgIn">Waga kg</label><input id="kgIn" type="number" inputmode="decimal" min="50" max="150" step="0.1"></div>
 <div class="alarm" id="alarm" hidden></div>
 
-<div class="big"><span class="l">Dystans z bieżni</span><span class="v" id="dist">0,00 km</span><span class="st" id="dist2">Z prędkości: 0,00 km</span></div>
+<h2>Interwały</h2>
+<div class="set">
+ <label for="iReps">Powt.</label><input id="iReps" type="number" inputmode="numeric" min="1" max="20">
+ <label for="iM">Metry</label><input id="iM" type="number" inputmode="numeric" min="100" max="5000" step="50">
+ <label for="iRest">Przerwa s</label><input id="iRest" type="number" inputmode="numeric" min="10" max="600" step="5">
+ <label for="iSpd">km/h</label><input id="iSpd" type="number" inputmode="decimal" min="5" max="16" step="0.5">
+</div>
+<div class="btns"><button id="iStart" disabled>▶ Start interwałów</button><button id="iStop" hidden>■ Przerwij interwały</button></div>
+<div class="ipanel" id="iPanel" hidden><div class="ph" id="iPh"></div><div class="pv" id="iVal"></div><div class="st" id="iSub"></div></div>
+
+<div class="big"><span class="l">Dystans z bieżni</span><span class="v" id="dist">0,00 km</span><span class="st" id="dist2">Z prędkości: 0,00 km</span><div class="goal" id="goalBar" hidden><i id="goalFill"></i></div><span class="st" id="goalTxt" hidden></span></div>
 
 <div class="grid">
  <div class="t"><div class="l">Czas</div><div class="v" id="time">0:00</div></div>
  <div class="t"><div class="l">Tempo</div><div class="v" id="pace">–:–</div></div>
  <div class="t"><div class="l">Prędkość km/h</div><div class="v" id="spd">0,0</div></div>
  <div class="t"><div class="l">Nachylenie %</div><div class="v" id="inc">0,0</div></div>
- <div class="t"><div class="l">Kcal (bieżnia)</div><div class="v" id="kcal">–</div></div>
+ <div class="t"><div class="l">Kcal (szac.)</div><div class="v" id="kcalE">0</div><div class="st" id="kcal">bieżnia: –</div></div>
  <div class="t"><div class="l">Tętno</div><div class="v"><span id="hr">–</span><span class="hrz" id="hrz" hidden></span></div></div>
 </div>
 
@@ -128,11 +153,15 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="st"><span class="leg"><i style="background:var(--acc)"></i>prędkość km/h</span><span class="leg"><i style="background:var(--mut)"></i>nachylenie %</span><span class="leg"><i style="background:var(--hr)"></i>tętno</span></div></div>
 
 <pre id="sum" hidden></pre>
-<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button></div>
+<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
 
 <h2>Strefy tętna</h2>
 <div class="chart" id="zones"></div>
 <div class="zset"><label for="hrMaxIn">Tętno maks.</label><input id="hrMaxIn" type="number" inputmode="numeric" min="150" max="220"><span>strefy = 50/60/70/80/90% maks., jak w zegarku</span></div>
+
+<h2>Statystyki</h2>
+<div class="chart"><canvas id="weeks" aria-label="Kilometry w tygodniach"></canvas><div class="st" id="weekTxt"></div></div>
+<div class="chart"><div class="rec" id="recs"></div></div>
 
 <h2>Historia</h2>
 <div id="hist" class="st">Brak zapisanych biegów.</div>
@@ -155,7 +184,7 @@ let dev,srv,cp=null,lastTs=0,S=null,wake=null,tick=null,shoes=store.get('buty','
 function setShoes(s){shoes=s;store.set('buty',s);document.querySelectorAll('#shoes button').forEach(b=>b.classList.toggle('on',b.dataset.s===s))}
 document.querySelectorAll('#shoes button').forEach(b=>b.onclick=()=>setShoes(b.dataset.s));setShoes(shoes);
 
-function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[],hrMax:0,zoneSecs:[0,0,0,0,0]}}
+function reset(){S={start:Date.now(),secs:0,machineSecs:null,dist:null,distInt:0,spd:0,inc:0,kcal:null,hr:null,hrSum:0,hrN:0,maxSpd:0,splits:[],lastSplitT:0,prof:[],hrMax:0,zoneSecs:[0,0,0,0,0],goalDone:false,iLog:[]}}
 const curDist=()=>S.dist??S.distInt, curSecs=()=>S.machineSecs??S.secs;
 
 function parse(dv){
@@ -218,6 +247,75 @@ $('pocket').addEventListener('pointerdown',e=>{e.preventDefault();holdStart=Date
 $('pocket').addEventListener('contextmenu',e=>e.preventDefault());
 function renderPocket(){if($('pocket').hidden)return;$('pHr').textContent=S.hr?('♥ '+S.hr):'♥ –';$('pKm').textContent=nf(curDist()/1000,2)+' km · '+fmtT(curSecs())}
 
+/* ---------- buty: liczniki ---------- */
+const SHOES=['Kiprun','Adidas','Reebok','Inne'];
+let BASE=Object.assign({Kiprun:41.5,Adidas:93.3,Reebok:0,Inne:0},store.get('butyStart',{}));
+function shoeTotals(){const t={...BASE};store.get('historia',[]).forEach(x=>{if(t[x.shoes]!=null)t[x.shoes]+=x.km||0});return t}
+function renderShoes(){const t=shoeTotals();$('shoeKm').innerHTML=SHOES.filter(n=>n!=='Inne').map(n=>{const v=t[n];const w=v>=700?' <span class="warn">⚠ czas na nowe</span>':v>=600?' <span class="warn">⚠ zbliża się 700 km</span>':'';return `${n}: <b>${nf(v,1)} km</b>${w}`}).join(' · ')}
+$('shoeBase').innerHTML=SHOES.map(n=>`<label for="b${n}">${n}</label><input id="b${n}" type="number" inputmode="decimal" step="0.1" min="0" value="${BASE[n]}">`).join('');
+SHOES.forEach(n=>$('b'+n).onchange=e=>{BASE[n]=Math.max(0,+e.target.value||0);store.set('butyStart',BASE);renderShoes()});
+
+/* ---------- kalorie, cel ---------- */
+let KG=store.get('waga',86),GOAL=store.get('celKm',0);
+$('kgIn').value=KG;$('goalIn').value=GOAL||'';
+$('kgIn').onchange=e=>{const v=+e.target.value;if(v>=50&&v<=150){KG=v;store.set('waga',v);render()}else e.target.value=KG};
+$('goalIn').onchange=e=>{const v=+e.target.value;GOAL=v>0&&v<=50?v:0;store.set('celKm',GOAL);e.target.value=GOAL||'';render()};
+function kcalEst(km,inc){km=km??curDist()/1000;inc=inc??S.inc;return Math.round(0.7*KG*km*(1+0.04*Math.max(0,inc)))}
+function renderGoal(){if(!GOAL){$('goalBar').hidden=$('goalTxt').hidden=true;return}
+ const km=curDist()/1000,pc=Math.min(100,km/GOAL*100);$('goalBar').hidden=$('goalTxt').hidden=false;$('goalFill').style.width=pc+'%';
+ $('goalTxt').textContent=km>=GOAL?'🎉 Cel '+nf(GOAL,1)+' km osiągnięty!':'Cel '+nf(GOAL,1)+' km · zostało '+nf(GOAL-km,2)+' km';
+ if(km>=GOAL&&!S.goalDone&&!$('stop').disabled){S.goalDone=true;beep([523,659,784,1047],0.16);try{navigator.vibrate([200,100,200,100,600])}catch(e){}setTimeout(()=>say('Cel osiągnięty! '+nf(GOAL,1).replace(',',' i ')+' kilometra. Brawo!'),900)}}
+
+/* ---------- interwały ---------- */
+let ICFG=Object.assign({reps:5,m:600,rest:90,spd:12},store.get('interwaly',{})),I={on:false},ctlOk=false;
+['Reps','M','Rest','Spd'].forEach(k=>{const key={Reps:'reps',M:'m',Rest:'rest',Spd:'spd'}[k];$('i'+k).value=ICFG[key];$('i'+k).onchange=e=>{const v=+e.target.value;if(v>0){ICFG[key]=v;store.set('interwaly',ICFG)}else e.target.value=ICFG[key]}});
+async function setSpeedAbs(v){if(!cp||!ctlOk)return;try{await cpSend([0x02,...new Uint8Array(new Uint16Array([Math.round(Math.min(16,v)*100)]).buffer)])}catch(e){}}
+function intStartRep(){I.phase='work';I.startD=curDist();I.startT=curSecs();
+ say(I.rep===ICFG.reps?'Ostatnie powtórzenie! Start!':'Powtórzenie '+I.rep+' z '+ICFG.reps+'. Start!');beep([988,988],0.12);try{navigator.vibrate([300,100,300])}catch(e){}setSpeedAbs(ICFG.spd);setPlan('int')}
+$('iStart').onclick=()=>{unlockAudio();I={on:true,rep:1,cd:-1};S.iLog=[];$('iStart').hidden=true;$('iStop').hidden=false;$('iPanel').hidden=false;intStartRep();intRender()};
+$('iStop').onclick=()=>intEnd('Interwały przerwane.');
+function intEnd(msg){I.on=false;$('iStart').hidden=false;$('iStop').hidden=true;$('iPanel').className='ipanel';$('iPh').textContent='Koniec';$('iVal').textContent=S.iLog.length+' × '+ICFG.m+' m';
+ $('iSub').textContent=S.iLog.map((x,i)=>(i+1)+': '+fmtT(x)).join(' · ');say(msg);beep([784,659,523],0.18);setSpeedAbs(5)}
+function intTick(){if(!I.on)return;const t=curSecs();
+ if(I.phase==='work'){const done=curDist()-I.startD;if(done>=ICFG.m){S.iLog.push(t-I.startT);
+   if(I.rep>=ICFG.reps){intEnd('Koniec interwałów! Świetna robota. Teraz spokojne schłodzenie.');return}
+   I.phase='rest';I.startT=t;say('Przerwa '+ICFG.rest+' sekund. Odcinek w '+paceWords(S.iLog[S.iLog.length-1]).replace(' ',' minuty ')+'.');beep([523],0.25);setSpeedAbs(5);try{navigator.vibrate(500)}catch(e){}}}
+ else{const left=ICFG.rest-(t-I.startT);if(left<=3&&left>0&&I.cd!==Math.ceil(left)){I.cd=Math.ceil(left);beep([660],0.08)}
+  if(left<=0){I.rep++;I.cd=-1;intStartRep()}}
+ intRender()}
+function intRender(){if(!I.on)return;const P=$('iPanel');P.className='ipanel '+I.phase;
+ if(I.phase==='work'){$('iPh').textContent='🔥 Powtórzenie '+I.rep+' / '+ICFG.reps;$('iVal').textContent=Math.max(0,Math.round(ICFG.m-(curDist()-I.startD)))+' m';$('iSub').textContent='zostało · czas '+fmtT(curSecs()-I.startT)+(ctlOk?' · bieżnia ustawiona na '+nf(ICFG.spd,1)+' km/h':' · ustaw '+nf(ICFG.spd,1)+' km/h')}
+ else{$('iPh').textContent='😮‍💨 Przerwa · marsz';$('iVal').textContent=fmtT(Math.max(0,ICFG.rest-(curSecs()-I.startT)));$('iSub').textContent='następne: '+(I.rep+1)+' / '+ICFG.reps}}
+
+/* ---------- statystyki i rekordy ---------- */
+function weekKey(ts){const d=new Date(ts);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()}
+function bestWindow(sp,n){if(!sp||sp.length<n)return null;let b=Infinity;for(let i=0;i+n<=sp.length;i++){const v=sp.slice(i,i+n).reduce((a,c)=>a+c,0);if(v<b)b=v}return b}
+function renderStats(){const h=store.get('historia',[]);const cv=$('weeks');
+ const now=weekKey(Date.now()),W=[];for(let i=7;i>=0;i--){const k=now-i*7*864e5;W.push({k,km:0})}
+ h.forEach(x=>{const w=W.find(w=>w.k===weekKey(x.date));if(w)w.km+=x.km});
+ const dpr=window.devicePixelRatio||1,Wd=cv.clientWidth||300,Ht=140;cv.style.height=Ht+'px';cv.width=Wd*dpr;cv.height=Ht*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);
+ const max=Math.max(10,...W.map(w=>w.km)),bw=(Wd-16)/W.length;g.font='11px Inter,system-ui,sans-serif';
+ W.forEach((w,i)=>{const bh=(Ht-36)*w.km/max,x=8+i*bw+4,y=Ht-20-bh;g.fillStyle=i===W.length-1?cssv('--acc'):cssv('--mut');g.globalAlpha=i===W.length-1?1:.45;g.fillRect(x,y,bw-8,bh);g.globalAlpha=1;
+  g.fillStyle=cssv('--fg');if(w.km)g.fillText(nf(w.km,0),x,y-4);g.fillStyle=cssv('--mut');const d=new Date(w.k);g.fillText(d.getDate()+'.'+(d.getMonth()+1),x,Ht-6)});
+ const m0=new Date();m0.setDate(1);m0.setHours(0,0,0,0);const mKm=h.filter(x=>x.date>=m0.getTime()).reduce((a,c)=>a+c.km,0);
+ $('weekTxt').textContent='Ten tydzień: '+nf(W[W.length-1].km,1)+' km · ten miesiąc: '+nf(mKm,1)+' km · biegów w apce: '+h.length;
+ const R=[];const longest=h.reduce((a,c)=>!a||c.km>a.km?c:a,null);
+ const rec=(lab,n)=>{let best=null;h.forEach(x=>{const v=n===0?null:bestWindow(x.splits,n);if(v!=null&&(!best||v<best.v))best={v,d:x.date}});return best?`<span>🏆 ${lab}</span><b>${fmtT(best.v)} · ${new Date(best.d).toLocaleDateString('pl-PL')}</b>`:`<span>🏆 ${lab}</span><span class="st">jeszcze brak</span>`};
+ R.push(rec('Najszybszy 1 km',1),rec('Najlepsze 5 km',5),rec('Najlepsze 10 km',10));
+ R.push(longest?`<span>🏆 Najdłuższy bieg</span><b>${nf(longest.km,2)} km · ${new Date(longest.date).toLocaleDateString('pl-PL')}</b>`:'<span>🏆 Najdłuższy bieg</span><span class="st">jeszcze brak</span>');
+ $('recs').innerHTML=R.join('')}
+
+/* ---------- eksport TCX (Strava) ---------- */
+function tcxOf(x){const st=new Date(x.date),iso=t=>new Date(x.date+t*1000).toISOString();const pts=[];
+ if(x.prof&&x.prof.length>1){let d=0,lt=0;x.prof.forEach(p=>{d=p[4]!=null?p[4]:d+(p[1]/3.6)*(p[0]-lt);lt=p[0];pts.push({t:p[0],d,hr:p[3],v:p[1]/3.6})})}
+ else{pts.push({t:0,d:0},{t:x.secs,d:x.km*1000})}
+ const tp=pts.map(p=>`<Trackpoint><Time>${iso(p.t)}</Time><DistanceMeters>${p.d.toFixed(1)}</DistanceMeters>${p.hr?`<HeartRateBpm><Value>${p.hr}</Value></HeartRateBpm>`:''}${p.v!=null?`<Extensions><ns3:TPX><ns3:Speed>${p.v.toFixed(2)}</ns3:Speed></ns3:TPX></Extensions>`:''}</Trackpoint>`).join('');
+ const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ return `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2"><Activities><Activity Sport="Running"><Id>${st.toISOString()}</Id><Lap StartTime="${st.toISOString()}"><TotalTimeSeconds>${Math.round(x.secs)}</TotalTimeSeconds><DistanceMeters>${(x.km*1000).toFixed(1)}</DistanceMeters><Calories>${x.kcalEst||kcalEst(x.km,0)}</Calories><Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>${tp}</Track></Lap><Notes>${esc('Bieżnia Marcina · '+x.shoes)}</Notes><Creator xsi:type="Device_t" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Name>Bieżnia Marcina</Name></Creator></Activity></Activities></TrainingCenterDatabase>`}
+function downloadTcx(x){const d=new Date(x.date),p=n=>String(n).padStart(2,'0');const name='bieznia-'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes())+'.tcx';
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([tcxOf(x)],{type:'application/vnd.garmin.tcx+xml'}));a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+
 /* ---------- głos co kilometr ---------- */
 let VOICE=store.get('glos',true);
 function voiceUi(){$('voiceBtn').textContent='🗣️ Głos co km: '+(VOICE?'wł.':'wył.');$('voiceBtn').classList.toggle('on',VOICE)}
@@ -277,7 +375,7 @@ function render(){
  $('spd').textContent=nf(S.spd,1);
  $('pace').textContent=S.spd>1?fmtT(3600/S.spd):'–:–';
  $('inc').textContent=nf(S.inc,1);
- $('kcal').textContent=S.kcal!=null?S.kcal:'–';
+ $('kcal').textContent='bieżnia: '+(S.kcal!=null?S.kcal:'–');$('kcalE').textContent=kcalEst();renderGoal();
  $('hr').textContent=S.hr??'–';renderPocket();{const z=S.hr?zoneOf(S.hr):-1;const e=$('hrz');if(z>=0){e.hidden=false;e.textContent='Z'+(z+1);e.style.background=ZCOL[z]}else e.hidden=true}renderZones();
 }
 async function lockScreen(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
@@ -292,9 +390,9 @@ $('conn').onclick=async()=>{
   dev=await navigator.bluetooth.requestDevice({filters:[{services:['fitness_machine']}]});
   dev.addEventListener('gattserverdisconnected',onTmLost);
   await subTreadmill();
-  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkAlarm();checkSplit();render();drawChart($('live'),S.prof)},1000)}
+  if(!S||$('stop').disabled){reset();renderSplits();clearInterval(tick);tick=setInterval(()=>{S.secs=(Date.now()-S.start)/1000;if(Math.round(S.secs)%5===0)S.prof.push([Math.round(curSecs()),Math.round(S.spd*10)/10,Math.round(S.inc*10)/10,S.hrLive?S.hr:null,Math.round(curDist())]);if(S.hrLive&&S.hr){const z=zoneOf(S.hr);if(z>=0)S.zoneSecs[z]++}checkAlarm();intTick();checkSplit();render();drawChart($('live'),S.prof)},1000)}
   $('st').innerHTML='Połączono: <b>'+(dev.name||'bieżnia')+'</b>';
-  $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
+  $('conn').disabled=true;$('stop').disabled=false;$('probe').disabled=false;$('iStart').disabled=false;$('sum').hidden=true;$('copy').hidden=true;lockScreen();
  }catch(e){$('st').textContent='Nie połączono';showErr(e.name==='NotFoundError'?'Nie wybrano bieżni albo żadnej nie znaleziono. Włącz bieżnię i spróbuj jeszcze raz.':(e.name==='SecurityError'?'Przeglądarka blokuje Bluetooth na tej stronie.':'Błąd: '+e.message))}
 };
 
@@ -317,7 +415,7 @@ $('probe').onclick=async()=>{
   await cp.startNotifications();cp.addEventListener('characteristicvaluechanged',onCp);
   const r=await cpSend([0x00]);
   info.push('Przejęcie sterowania: '+r.txt+'.');
-  if(r.code===1){$('ctl').hidden=false;info.push('Sterowanie odblokowane. Zmiany idą małymi krokami.')}
+  if(r.code===1){ctlOk=true;$('ctl').hidden=false;info.push('Sterowanie odblokowane. Zmiany idą małymi krokami.')}
   else info.push('Sterowanie niedostępne, odczyt działa dalej normalnie.');
  }catch(e){info.push('Bieżnia nie udostępnia sterowania ('+e.message+').')}
  $('ctlInfo').innerHTML=info.join('<br>');
@@ -375,6 +473,7 @@ $('hrBtn').onclick=async()=>{
 };
 
 /* ---------- koniec biegu, historia ---------- */
+let lastRun=null;$('tcxBtn').onclick=()=>{if(lastRun)downloadTcx(lastRun)};
 $('stop').onclick=()=>{
  userStop=true;clearTimeout(tmTimer);clearTimeout(hrTimer);clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
@@ -382,13 +481,14 @@ $('stop').onclick=()=>{
  const txt=['Bieżnia '+d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' ('+(dev?.name||'bieżnia')+')',
  'Buty: '+shoes,'Trening: '+({easy:'spokojny',long:'długi',int:'interwały',free:'bez limitu'}[plan])+(LIMIT?' (limit tętna '+LIMIT+')':''),'Dystans (bieżnia): '+nf(km,2)+' km','Dystans (z prędkości): '+nf(S.distInt/1000,2)+' km','Czas: '+fmtT(secs),
  'Średnie tempo: '+(km>0.05?fmtT(secs/km)+' /km':'–'),'Maks. prędkość: '+nf(S.maxSpd,1)+' km/h',
- 'Kcal (bieżnia): '+(S.kcal??'–'),'Śr. tętno: '+(S.hrN?Math.round(S.hrSum/S.hrN):'–')+(S.hrMax?' (maks. '+S.hrMax+')':''),
+ 'Kcal: ~'+kcalEst()+' netto szac. (bieżnia: '+(S.kcal??'–')+')','Śr. tętno: '+(S.hrN?Math.round(S.hrSum/S.hrN):'–')+(S.hrMax?' (maks. '+S.hrMax+')':''),
  S.zoneSecs.some(x=>x)?'Strefy: '+S.zoneSecs.map((z,i)=>'Z'+(i+1)+' '+fmtT(z)).join(', '):'',
- sp?'Odcinki: '+sp:''].filter(Boolean).join('\n');
+ sp?'Odcinki: '+sp:'',
+ S.iLog.length?'Interwały: '+S.iLog.length+' × '+ICFG.m+' m: '+S.iLog.map(fmtT).join(', '):''].filter(Boolean).join('\n');
  $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
- $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;
+ $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;ctlOk=false;if(I.on){I.on=false;$('iStart').hidden=false;$('iStop').hidden=true}$('iStart').disabled=true;
  $('st').textContent='Bieg zakończony';
- if(km>0.05){const h=store.get('historia',[]);h.unshift({txt,km,secs,shoes,date:S.start,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)});store.set('historia',h);exportHist(true)}
+ if(km>0.05){const h=store.get('historia',[]);const run={txt,km,secs,shoes,date:S.start,kcalEst:kcalEst(),iLog:S.iLog,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)};h.unshift(run);store.set('historia',h);exportHist(true);lastRun=run;$('tcxBtn').hidden=false}
  renderHist();
 };
 /* ---------- kopie zapasowe: plik JSON w Pobranych ---------- */
@@ -417,6 +517,7 @@ $('impFile').onchange=async e=>{
 (()=>{const k=store.get('ostatniaKopia',null);if(k)$('bkInfo').textContent='Ostatnia kopia: '+new Date(k).toLocaleString('pl-PL')})();
 $('copy').onclick=async()=>{const t=$('sum').textContent;try{await navigator.clipboard.writeText(t);$('copy').textContent='Skopiowano'}catch(e){const r=document.createRange();r.selectNodeContents($('sum'));getSelection().removeAllRanges();getSelection().addRange(r)}};
 function renderHist(){
+ renderShoes();renderStats();
  const h=store.get('historia',[]);if(!h.length){$('hist').textContent='Brak zapisanych biegów.';return}
  $('hist').innerHTML='';h.slice(0,10).forEach(x=>{const d=document.createElement('details');const s=document.createElement('summary');
   s.textContent=new Date(x.date).toLocaleDateString('pl-PL')+' · '+nf(x.km,2)+' km · '+fmtT(x.secs)+' · '+x.shoes;
@@ -424,7 +525,8 @@ function renderHist(){
   if(x.splits&&x.splits.length){const t=document.createElement('table');t.className='sp';t.style.marginTop='10px';t.innerHTML='<thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody>'+splitRows(x.splits)+'</tbody>';d.append(t)}
   if(x.prof&&x.prof.length>1){const c=document.createElement('div');c.className='chart';const cv=document.createElement('canvas');c.append(cv);d.append(c);d.addEventListener('toggle',()=>{if(d.open)drawChart(cv,x.prof)})}
   if(x.zones&&x.zones.some(v=>v)){const z=document.createElement('div');z.className='chart';z.innerHTML=zoneHtml(x.zones,-1);d.append(z)}
-  d.append(p);$('hist').append(d)});
+  const tb=document.createElement('button');tb.textContent='🟠 Pobierz TCX do Stravy';tb.style.marginTop='8px';tb.onclick=()=>downloadTcx(x);
+  d.append(p,tb);$('hist').append(d)});
 }
 reset();render();renderHist();drawChart($('live'),[]);addEventListener('resize',()=>drawChart($('live'),S.prof));
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
