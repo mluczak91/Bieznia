@@ -90,32 +90,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 </head>
 <body>
 <div class="top"><h1>Bieżnia Marcina</h1><div class="st" id="st">Nie połączono</div></div>
-
-<h2>Buty</h2>
-<div class="btns shoes" id="shoes">
- <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Reebok">Reebok</button><button data-s="Inne">Inne</button>
-</div>
-<div class="st" id="shoeKm" style="margin-top:8px"></div>
-<details><summary>Przebiegi butów sprzed apki</summary><div class="set" id="shoeBase"></div></details>
-
-<h2>Trening</h2>
-<div class="btns shoes" id="plans">
- <button data-p="easy">Spokojny &lt; 135</button><button data-p="long">Długi &lt; 140</button><button data-p="int">Interwały</button><button data-p="free">Bez limitu</button>
-</div>
-<div class="btns shoes"><button id="voiceBtn">🗣️ Głos co km: wył.</button><button id="voiceTest">Test głosu</button></div>
-<div class="lim"><label for="limIn">Alarm tętna powyżej</label><input id="limIn" type="number" inputmode="numeric" min="100" max="200"><span>· dźwięk + wibracja po 10 s nad limitem</span></div>
-<div class="set"><label for="goalIn">Cel km</label><input id="goalIn" type="number" inputmode="decimal" min="0" max="50" step="0.5"><label for="kgIn">Waga kg</label><input id="kgIn" type="number" inputmode="decimal" min="50" max="150" step="0.1"></div>
 <div class="alarm" id="alarm" hidden></div>
-
-<h2>Interwały</h2>
-<div class="set">
- <label for="iReps">Powt.</label><input id="iReps" type="number" inputmode="numeric" min="1" max="20">
- <label for="iM">Metry</label><input id="iM" type="number" inputmode="numeric" min="100" max="5000" step="50">
- <label for="iRest">Przerwa s</label><input id="iRest" type="number" inputmode="numeric" min="10" max="600" step="5">
- <label for="iSpd">km/h</label><input id="iSpd" type="number" inputmode="decimal" min="5" max="16" step="0.5">
-</div>
-<div class="btns"><button id="iStart" disabled>▶ Start interwałów</button><button id="iStop" hidden>■ Przerwij interwały</button></div>
-<div class="ipanel" id="iPanel" hidden><div class="ph" id="iPh"></div><div class="pv" id="iVal"></div><div class="st" id="iSub"></div></div>
 
 <div class="big"><span class="l">Dystans z bieżni</span><span class="v" id="dist">0,00 km</span><span class="st" id="dist2">Z prędkości: 0,00 km</span><div class="goal" id="goalBar" hidden><i id="goalFill"></i></div><span class="st" id="goalTxt" hidden></span></div>
 
@@ -136,6 +111,46 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="pocket" id="pocket" hidden><div class="ph" id="pHr">–</div><div class="pk" id="pKm">0,00 km</div><div class="pr"><i id="pProg"></i></div><div class="pt">Przytrzymaj ekran 2 sekundy, żeby wyjść</div></div>
 <div class="st" id="hrSt">Zegarek albo pas na klatkę z Bluetooth (standard Heart Rate).</div>
 <div class="err" id="err" hidden></div>
+<div class="btns"><button id="iStart" disabled>▶ Start interwałów</button><button id="iStop" hidden>■ Przerwij interwały</button></div>
+<div class="ipanel" id="iPanel" hidden><div class="ph" id="iPh"></div><div class="pv" id="iVal"></div><div class="st" id="iSub"></div></div>
+<pre id="sum" hidden></pre>
+<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
+<h2>Odcinki co 1 km</h2>
+<table class="sp"><thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody id="splits"><tr><td colspan="4" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr></tbody></table>
+
+<h2>Prędkość i nachylenie</h2>
+<div class="chart"><canvas id="live" aria-label="Wykres prędkości i nachylenia w czasie"></canvas>
+<div class="st"><span class="leg"><i style="background:var(--acc)"></i>prędkość km/h</span><span class="leg"><i style="background:var(--mut)"></i>nachylenie %</span><span class="leg"><i style="background:var(--hr)"></i>tętno</span></div></div>
+
+
+
+<h2>Strefy tętna</h2>
+<div class="chart" id="zones"></div>
+<div class="zset"><label for="hrMaxIn">Tętno maks.</label><input id="hrMaxIn" type="number" inputmode="numeric" min="150" max="220"><span>strefy = 50/60/70/80/90% maks., jak w zegarku</span></div>
+
+<h2 style="margin-top:28px">⚙️ Ustawienia</h2>
+<h2>Buty</h2>
+<div class="btns shoes" id="shoes">
+ <button data-s="Kiprun">Kiprun</button><button data-s="Adidas">Adidas</button><button data-s="Reebok">Reebok</button><button data-s="Inne">Inne</button>
+</div>
+<div class="st" id="shoeKm" style="margin-top:8px"></div>
+<details><summary>Przebiegi butów sprzed apki</summary><div class="set" id="shoeBase"></div></details>
+
+<h2>Trening</h2>
+<div class="btns shoes" id="plans">
+ <button data-p="easy">Spokojny &lt; 135</button><button data-p="long">Długi &lt; 140</button><button data-p="int">Interwały</button><button data-p="free">Bez limitu</button>
+</div>
+<div class="btns shoes"><button id="voiceBtn">🗣️ Głos co km: wył.</button><button id="voiceTest">Test głosu</button></div>
+<div class="lim"><label for="limIn">Alarm tętna powyżej</label><input id="limIn" type="number" inputmode="numeric" min="100" max="200"><span>· dźwięk + wibracja po 10 s nad limitem</span></div>
+<div class="set"><label for="goalIn">Cel km</label><input id="goalIn" type="number" inputmode="decimal" min="0" max="50" step="0.5"><label for="kgIn">Waga kg</label><input id="kgIn" type="number" inputmode="decimal" min="50" max="150" step="0.1"></div>
+
+<h2>Interwały</h2>
+<div class="set">
+ <label for="iReps">Powt.</label><input id="iReps" type="number" inputmode="numeric" min="1" max="20">
+ <label for="iM">Metry</label><input id="iM" type="number" inputmode="numeric" min="100" max="5000" step="50">
+ <label for="iRest">Przerwa s</label><input id="iRest" type="number" inputmode="numeric" min="10" max="600" step="5">
+ <label for="iSpd">km/h</label><input id="iSpd" type="number" inputmode="decimal" min="5" max="16" step="0.5">
+</div>
 
 <h2>Sterowanie</h2>
 <div class="st" id="ctlInfo">Połącz się, a potem kliknij „Sprawdź sterowanie”. Taśmę zawsze uruchamiasz na bieżni.</div>
@@ -144,20 +159,6 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
  <div class="t"><div class="l">Prędkość</div><div class="row"><button id="sDn" aria-label="Wolniej">−</button><button id="sUp" aria-label="Szybciej">+</button></div><div class="st">krok 0,5 km/h, maks. 16</div></div>
  <div class="t"><div class="l">Nachylenie</div><div class="row"><button id="iDn" aria-label="Mniejsze nachylenie">−</button><button id="iUp" aria-label="Większe nachylenie">+</button></div><div class="st">krok 0,5%, 0–12%</div></div>
 </div>
-
-<h2>Odcinki co 1 km</h2>
-<table class="sp"><thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody id="splits"><tr><td colspan="4" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr></tbody></table>
-
-<h2>Prędkość i nachylenie</h2>
-<div class="chart"><canvas id="live" aria-label="Wykres prędkości i nachylenia w czasie"></canvas>
-<div class="st"><span class="leg"><i style="background:var(--acc)"></i>prędkość km/h</span><span class="leg"><i style="background:var(--mut)"></i>nachylenie %</span><span class="leg"><i style="background:var(--hr)"></i>tętno</span></div></div>
-
-<pre id="sum" hidden></pre>
-<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
-
-<h2>Strefy tętna</h2>
-<div class="chart" id="zones"></div>
-<div class="zset"><label for="hrMaxIn">Tętno maks.</label><input id="hrMaxIn" type="number" inputmode="numeric" min="150" max="220"><span>strefy = 50/60/70/80/90% maks., jak w zegarku</span></div>
 
 <h2>Statystyki</h2>
 <div class="chart"><canvas id="weeks" aria-label="Kilometry w tygodniach"></canvas><div class="st" id="weekTxt"></div></div>
