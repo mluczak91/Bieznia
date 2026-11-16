@@ -114,7 +114,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="btns"><button id="iStart" disabled>▶ Start interwałów</button><button id="iStop" hidden>■ Przerwij interwały</button></div>
 <div class="ipanel" id="iPanel" hidden><div class="ph" id="iPh"></div><div class="pv" id="iVal"></div><div class="st" id="iSub"></div></div>
 <pre id="sum" hidden></pre>
-<div class="btns"><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
+<div class="btns"><button class="p" id="shareBtn" hidden>📤 Wyślij raport</button><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
 <h2>Odcinki co 1 km</h2>
 <table class="sp"><thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody id="splits"><tr><td colspan="4" class="st">Pierwszy kilometr pojawi się tutaj.</td></tr></tbody></table>
 
@@ -474,7 +474,11 @@ $('hrBtn').onclick=async()=>{
 };
 
 /* ---------- koniec biegu, historia ---------- */
-let lastRun=null;$('tcxBtn').onclick=()=>{if(lastRun)downloadTcx(lastRun)};
+async function shareRun(x){
+ const title='Bieżnia '+new Date(x.date).toLocaleDateString('pl-PL')+' · '+nf(x.km,2)+' km';
+ try{if(navigator.share){await navigator.share({title,text:x.txt});return}}catch(e){if(e.name==='AbortError')return}
+ try{await navigator.clipboard.writeText(x.txt);showErr('Udostępnianie niedostępne, raport skopiowany. Wklej go w Claude.')}catch(e){showErr('Nie udało się udostępnić. Użyj „Kopiuj podsumowanie”.')}}
+let lastRun=null;$('shareBtn').onclick=()=>{if(lastRun)shareRun(lastRun)};$('tcxBtn').onclick=()=>{if(lastRun)downloadTcx(lastRun)};
 $('stop').onclick=()=>{
  userStop=true;clearTimeout(tmTimer);clearTimeout(hrTimer);clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
@@ -489,7 +493,7 @@ $('stop').onclick=()=>{
  $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
  $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;ctlOk=false;if(I.on){I.on=false;$('iStart').hidden=false;$('iStop').hidden=true}$('iStart').disabled=true;
  $('st').textContent='Bieg zakończony';
- if(km>0.05){const h=store.get('historia',[]);const run={txt,km,secs,shoes,date:S.start,kcalEst:kcalEst(),iLog:S.iLog,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)};h.unshift(run);store.set('historia',h);exportHist(true);lastRun=run;$('tcxBtn').hidden=false}
+ if(km>0.05){const h=store.get('historia',[]);const run={txt,km,secs,shoes,date:S.start,kcalEst:kcalEst(),iLog:S.iLog,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)};h.unshift(run);store.set('historia',h);exportHist(true);lastRun=run;$('tcxBtn').hidden=false;$('shareBtn').hidden=false}
  renderHist();
 };
 /* ---------- kopie zapasowe: plik JSON w Pobranych ---------- */
@@ -526,8 +530,10 @@ function renderHist(){
   if(x.splits&&x.splits.length){const t=document.createElement('table');t.className='sp';t.style.marginTop='10px';t.innerHTML='<thead><tr><th>km</th><th>Czas</th><th>Tempo</th><th class="bw"></th></tr></thead><tbody>'+splitRows(x.splits)+'</tbody>';d.append(t)}
   if(x.prof&&x.prof.length>1){const c=document.createElement('div');c.className='chart';const cv=document.createElement('canvas');c.append(cv);d.append(c);d.addEventListener('toggle',()=>{if(d.open)drawChart(cv,x.prof)})}
   if(x.zones&&x.zones.some(v=>v)){const z=document.createElement('div');z.className='chart';z.innerHTML=zoneHtml(x.zones,-1);d.append(z)}
-  const tb=document.createElement('button');tb.textContent='🟠 Pobierz TCX do Stravy';tb.style.marginTop='8px';tb.onclick=()=>downloadTcx(x);
-  d.append(p,tb);$('hist').append(d)});
+  const tb=document.createElement('button');tb.textContent='🟠 Pobierz TCX do Stravy';tb.onclick=()=>downloadTcx(x);
+  const sb=document.createElement('button');sb.textContent='📤 Wyślij raport';sb.className='p';sb.onclick=()=>shareRun(x);
+  const bw=document.createElement('div');bw.className='btns';bw.append(sb,tb);
+  d.append(p,bw);$('hist').append(d)});
 }
 reset();render();renderHist();drawChart($('live'),[]);addEventListener('resize',()=>drawChart($('live'),S.prof));
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
