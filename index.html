@@ -480,8 +480,45 @@ $('hrBtn').onclick=async()=>{
 };
 
 /* ---------- koniec biegu, historia ---------- */
+/* ---------- raport jako obrazek ---------- */
+function reportCanvas(x){
+ const C={bg:'#0f1215',card:'#181c21',fg:'#eef1f4',mut:'#93a0ad',acc:'#ff6a4d',ok:'#4cc27e',line:'#2a3038',hr:'#ff5c9a'};
+ const W=1080,P=48,sp=x.splits||[],zs=x.zones&&x.zones.some(v=>v)?x.zones:null,pr=x.prof&&x.prof.length>1?x.prof:null;
+ const hrAvg=x.hrAvg||(+((x.txt||'').match(/Śr\. tętno: (\d+)/)||[])[1]||null);
+ let H=P+90+170+(pr?380:0)+(sp.length?70+sp.length*44:0)+(zs?70+5*44:0)+80;
+ const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+ g.fillStyle=C.bg;g.fillRect(0,0,W,H);let y=P;
+ const F=(w,sz)=>w+' '+sz+'px "Space Grotesk",Inter,system-ui,sans-serif';
+ g.fillStyle=C.acc;g.font=F(700,30);g.fillText('BIEŻNIA MARCINA',P,y+28);
+ g.fillStyle=C.mut;g.font=F(500,28);const d=new Date(x.date);g.textAlign='right';g.fillText(d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})+' · '+x.shoes,W-P,y+28);g.textAlign='left';
+ y+=90;
+ const tiles=[['DYSTANS',nf(x.km,2)+' km'],['CZAS',fmtT(x.secs)],['TEMPO',x.km>0.05?fmtT(x.secs/x.km):'–'],['KCAL',String(x.kcalEst||kcalEst(x.km,0))],['TĘTNO',hrAvg?String(hrAvg):'–']];
+ const tw=(W-2*P-4*16)/5;tiles.forEach((t,i)=>{const tx=P+i*(tw+16);g.fillStyle=C.card;g.beginPath();g.roundRect(tx,y,tw,140,20);g.fill();
+  g.fillStyle=C.mut;g.font=F(500,22);g.fillText(t[0],tx+20,y+40);g.fillStyle=i===0?C.acc:C.fg;g.font=F(700,i===0?40:38);g.fillText(t[1],tx+20,y+100)});
+ y+=170;
+ if(pr){g.fillStyle=C.card;g.beginPath();g.roundRect(P,y,W-2*P,350,20);g.fill();g.fillStyle=C.mut;g.font=F(500,22);g.fillText('PRĘDKOŚĆ · NACHYLENIE'+(pr.some(p=>p[3])?' · TĘTNO':''),P+24,y+40);
+  const L=P+60,T=y+60,pw=W-2*P-90,ph=250,tMax=Math.max(60,...pr.map(p=>p[0])),vMax=Math.max(12,Math.ceil(Math.max(...pr.map(p=>p[1]))/2)*2),iMax=Math.max(5,...pr.map(p=>p[2]));
+  g.strokeStyle=C.line;g.lineWidth=2;g.font=F(500,20);g.fillStyle=C.mut;
+  for(let v=0;v<=vMax;v+=vMax/4){const yy=T+ph-ph*v/vMax;g.beginPath();g.moveTo(L,yy);g.lineTo(L+pw,yy);g.stroke();g.fillText(String(Math.round(v)),P+20,yy+7)}
+  const xt=t=>L+pw*t/tMax;
+  g.strokeStyle=C.mut;g.setLineDash([8,8]);g.beginPath();pr.forEach((p,i)=>{const X=xt(p[0]),Y=T+ph-ph*p[2]/iMax*0.5;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();g.setLineDash([]);
+  if(pr.some(p=>p[3])){g.strokeStyle=C.hr;g.lineWidth=3;g.beginPath();let st=false;pr.forEach(p=>{if(!p[3]){st=false;return}const X=xt(p[0]),Y=T+ph-ph*Math.min(1,Math.max(0,(p[3]-60)/140));st?g.lineTo(X,Y):g.moveTo(X,Y);st=true});g.stroke()}
+  g.strokeStyle=C.acc;g.lineWidth=5;g.beginPath();pr.forEach((p,i)=>{const X=xt(p[0]),Y=T+ph-ph*p[1]/vMax;i?g.lineTo(X,Y):g.moveTo(X,Y)});g.stroke();
+  g.fillStyle=C.mut;g.fillText('0′',L,T+ph+28);g.textAlign='right';g.fillText(Math.round(tMax/60)+'′',L+pw,T+ph+28);g.textAlign='left';
+  y+=380}
+ if(sp.length){g.fillStyle=C.mut;g.font=F(500,22);g.fillText('ODCINKI CO 1 KM',P,y+30);y+=56;const best=Math.min(...sp),worst=Math.max(...sp);
+  sp.forEach((v,i)=>{const w=worst===best?1:0.4+0.6*(worst-v)/(worst-best);g.fillStyle=C.fg;g.font=F(600,26);g.fillText((i+1)+(v===best&&sp.length>1?' ★':''),P,y+26);
+   g.fillStyle=C.mut;g.fillText(fmtT(v)+' /km',P+90,y+26);g.fillStyle=v===best?C.ok:C.acc;g.beginPath();g.roundRect(P+260,y+8,(W-2*P-260)*w,20,10);g.fill();y+=44})}
+ if(zs){y+=14;g.fillStyle=C.mut;g.font=F(500,22);g.fillText('STREFY TĘTNA',P,y+30);y+=56;const tot=zs.reduce((a,c)=>a+c,0)||1;
+  [4,3,2,1,0].forEach(i=>{g.fillStyle=ZCOL[i];g.font=F(700,26);g.fillText('Z'+(i+1),P,y+26);g.fillStyle=C.line;g.beginPath();g.roundRect(P+80,y+8,W-2*P-300,20,10);g.fill();
+   g.fillStyle=ZCOL[i];g.beginPath();g.roundRect(P+80,y+8,Math.max(2,(W-2*P-300)*zs[i]/tot),20,10);g.fill();g.fillStyle=C.fg;g.font=F(600,26);g.fillText(fmtT(zs[i])+'  '+Math.round(zs[i]/tot*100)+'%',W-P-200,y+26);y+=44})}
+ g.fillStyle=C.mut;g.font=F(500,20);g.fillText('mluczak91.github.io/Bieznia',P,H-30);
+ return cv}
 async function shareRun(x){
  const title='Bieżnia '+new Date(x.date).toLocaleDateString('pl-PL')+' · '+nf(x.km,2)+' km';
+ try{const blob=await new Promise(r=>reportCanvas(x).toBlob(r,'image/png'));const d=new Date(x.date),p=n=>String(n).padStart(2,'0');
+  const f=new File([blob],'bieg-'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'.png',{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({title,text:x.txt,files:[f]});return}}catch(e){if(e.name==='AbortError')return}
  try{if(navigator.share){await navigator.share({title,text:x.txt});return}}catch(e){if(e.name==='AbortError')return}
  try{await navigator.clipboard.writeText(x.txt);showErr('Udostępnianie niedostępne, raport skopiowany. Wklej go w Claude.')}catch(e){showErr('Nie udało się udostępnić. Użyj „Kopiuj podsumowanie”.')}}
 let lastRun=null;$('shareBtn').onclick=()=>{if(lastRun)shareRun(lastRun)};$('tcxBtn').onclick=()=>{if(lastRun)downloadTcx(lastRun)};
@@ -499,7 +536,7 @@ $('stop').onclick=()=>{
  $('sum').textContent=txt;$('sum').hidden=false;$('copy').hidden=false;$('copy').textContent='Kopiuj podsumowanie';
  $('stop').disabled=true;$('conn').disabled=false;$('probe').disabled=true;$('ctl').hidden=true;cp=null;ctlOk=false;if(I.on){I.on=false;$('iStart').hidden=false;$('iStop').hidden=true}$('iStart').disabled=true;
  $('st').textContent='Bieg zakończony';
- if(km>0.05){const h=store.get('historia',[]);const run={txt,km,secs,shoes,date:S.start,kcalEst:kcalEst(),iLog:S.iLog,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)};h.unshift(run);store.set('historia',h);exportHist(true);lastRun=run;$('tcxBtn').hidden=false;$('shareBtn').hidden=false}
+ if(km>0.05){const h=store.get('historia',[]);const run={txt,km,secs,shoes,date:S.start,kcalEst:kcalEst(),hrAvg:S.hrN?Math.round(S.hrSum/S.hrN):null,hrMax:S.hrMax||null,iLog:S.iLog,splits:S.splits,kcal:S.kcal,maxSpd:S.maxSpd,zones:S.zoneSecs,prof:S.prof.filter((p,i,a)=>a.length<=400||i%Math.ceil(a.length/400)===0)};h.unshift(run);store.set('historia',h);exportHist(true);lastRun=run;$('tcxBtn').hidden=false;$('shareBtn').hidden=false}
  renderHist();
 };
 /* ---------- kopie zapasowe: plik JSON w Pobranych ---------- */
