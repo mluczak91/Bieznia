@@ -83,6 +83,10 @@ details{margin-top:8px}
 .rec b{font-weight:600}
 .warn{color:var(--acc);font-weight:600}
 @media (orientation:landscape) and (max-height:540px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.big .v{font-size:52px}}
+#stop{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#stop small{font-weight:500;font-size:12px;opacity:.75}
+.hold-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--acc);opacity:.35;pointer-events:none}
+.hold-txt{position:relative}
 .leg{display:inline-flex;align-items:center;gap:6px}
 .leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 summary{cursor:pointer;color:var(--mut);font-size:14px}
@@ -105,7 +109,6 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 
 <div class="btns">
  <button class="p" id="conn">Połącz z bieżnią</button>
- <button id="stop" disabled>Zakończ bieg</button>
 </div>
 <div class="btns"><button id="hrBtn">❤️ Połącz tętno</button><button id="pocketBtn">🌑 Tryb kieszeni</button></div>
 <div class="pocket" id="pocket" hidden><div class="ph" id="pHr">–</div><div class="pk" id="pKm">0,00 km</div><div class="pr"><i id="pProg"></i></div><div class="pt">Przytrzymaj ekran 2 sekundy, żeby wyjść</div></div>
@@ -113,6 +116,7 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 <div class="err" id="err" hidden></div>
 <div class="btns"><button id="iStart" disabled>▶ Start interwałów</button><button id="iStop" hidden>■ Przerwij interwały</button></div>
 <div class="ipanel" id="iPanel" hidden><div class="ph" id="iPh"></div><div class="pv" id="iVal"></div><div class="st" id="iSub"></div></div>
+<div class="btns" style="margin-top:24px"><button id="stop" disabled><span class="hold-fill" id="stopFill"></span><span class="hold-txt" id="stopTxt">Zakończ bieg<br><small>przytrzymaj 2 s</small></span></button></div>
 <pre id="sum" hidden></pre>
 <div class="btns"><button class="p" id="shareBtn" hidden>📤 Wyślij raport</button><button id="copy" hidden>Kopiuj podsumowanie</button><button id="tcxBtn" hidden>🟠 Pobierz TCX do Stravy</button></div>
 <h2>Odcinki co 1 km</h2>
@@ -522,7 +526,15 @@ async function shareRun(x){
  try{if(navigator.share){await navigator.share({title,text:x.txt});return}}catch(e){if(e.name==='AbortError')return}
  try{await navigator.clipboard.writeText(x.txt);showErr('Udostępnianie niedostępne, raport skopiowany. Wklej go w Claude.')}catch(e){showErr('Nie udało się udostępnić. Użyj „Kopiuj podsumowanie”.')}}
 let lastRun=null;$('shareBtn').onclick=()=>{if(lastRun)shareRun(lastRun)};$('tcxBtn').onclick=()=>{if(lastRun)downloadTcx(lastRun)};
-$('stop').onclick=()=>{
+(()=>{const b=$('stop');let t0=0,raf=null,tm=null;
+ const end=()=>{clearTimeout(tm);cancelAnimationFrame(raf);$('stopFill').style.width='0'};
+ b.addEventListener('pointerdown',e=>{if(b.disabled)return;e.preventDefault();t0=Date.now();
+  const st=()=>{$('stopFill').style.width=Math.min(100,(Date.now()-t0)/20)+'%';raf=requestAnimationFrame(st)};st();
+  tm=setTimeout(()=>{end();try{navigator.vibrate(200)}catch(x){}finishRun()},2000)});
+ ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t,end));
+ b.addEventListener('contextmenu',e=>e.preventDefault());
+ b.addEventListener('click',()=>{if(!b.disabled&&!$('stopFill').style.width.startsWith('1'))showErr('Żeby zakończyć bieg, przytrzymaj przycisk 2 sekundy.')})})();
+function finishRun(){
  userStop=true;clearTimeout(tmTimer);clearTimeout(hrTimer);clearInterval(tick);$('alarm').hidden=true;try{dev?.gatt?.disconnect()}catch(e){}try{hrDev?.gatt?.disconnect()}catch(e){}try{wake?.release()}catch(e){}
  const secs=curSecs(),km=curDist()/1000;const d=new Date(S.start);
  let acc=0;const sp=S.splits.map((s,i)=>{acc+=s;return `${i+1} km: ${fmtT(s)}`}).join(', ');
