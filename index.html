@@ -440,7 +440,13 @@ $('iDn').onclick=()=>setInc(-0.5);
 let userStop=false,tmTry=0,hrTry=0,tmTimer=null,hrTimer=null;
 async function subTreadmill(){srv=await (await dev.gatt.connect()).getPrimaryService('fitness_machine');
  const ch=await srv.getCharacteristic('treadmill_data');await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onData)}
-async function subHr(){const ch=await (await (await hrDev.gatt.connect()).getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
+let hrBatt=null;
+function battTxt(){return hrBatt==null?'':' · 🔋 '+hrBatt+'%'+(hrBatt<=20?' – naładuj pas!':'')}
+async function readBatt(gs){try{const c=await (await gs.getPrimaryService('battery_service')).getCharacteristic('battery_level');
+ hrBatt=(await c.readValue()).getUint8(0);try{await c.startNotifications();c.addEventListener('characteristicvaluechanged',e=>{hrBatt=e.target.value.getUint8(0);showHrSt()})}catch(e){}
+ if(hrBatt<=20){say('Bateria pasa '+hrBatt+' procent. Naładuj go po treningu.');try{navigator.vibrate(300)}catch(e){}}}catch(e){hrBatt=null}}
+function showHrSt(){if(hrDev&&hrDev.gatt.connected)$('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b>'+battTxt()}
+async function subHr(){const gs=await hrDev.gatt.connect();await readBatt(gs);const ch=await (await gs.getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
  await ch.startNotifications();ch.addEventListener('characteristicvaluechanged',onHr)}
 function onTmLost(){cp=null;$('ctl').hidden=true;$('probe').disabled=true;lastTs=0;
  if(userStop||$('stop').disabled){$('st').textContent='Rozłączono';$('conn').disabled=false;return}
@@ -452,7 +458,7 @@ async function retryTm(){clearTimeout(tmTimer);if(userStop||$('stop').disabled||
 function onHrLost(){S.hrLive=false;if(userStop){$('hrSt').textContent='Tętno rozłączone';$('hrBtn').disabled=false;return}
  $('hrSt').innerHTML='<b>Łączę ponownie z pasem…</b>';hrTry=0;retryHr()}
 async function retryHr(){clearTimeout(hrTimer);if(userStop||hrDev?.gatt?.connected)return;
- hrTry++;try{await subHr();$('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b> (połączono ponownie)'}
+ hrTry++;try{await subHr();showHrSt()}
  catch(e){if(hrTry<40){$('hrSt').innerHTML='<b>Łączę ponownie z pasem…</b> (próba '+hrTry+')';hrTimer=setTimeout(retryHr,3000)}
   else{$('hrSt').innerHTML='<b>Tętno rozłączone</b>, kliknij ponownie';$('hrBtn').disabled=false}}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;
@@ -466,10 +472,10 @@ function onHr(e){const v=e.target.value,f=v.getUint8(0);const hr=(f&1)?v.getUint
 $('hrBtn').onclick=async()=>{
  showErr('');unlockAudio();userStop=false;if(!navigator.bluetooth){showErr('Ta przeglądarka nie obsługuje Bluetooth.');return}
  try{$('hrSt').textContent='Szukam pulsometru…';
-  hrDev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
+  hrDev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}],optionalServices:['battery_service']});
   hrDev.addEventListener('gattserverdisconnected',onHrLost);
   await subHr();
-  $('hrSt').innerHTML='Tętno: <b>'+(hrDev.name||'pulsometr')+'</b>';$('hrBtn').disabled=true;
+  showHrSt();$('hrBtn').disabled=true;
  }catch(e){$('hrSt').textContent=e.name==='NotFoundError'?'Nie znaleziono pulsometru. Włącz w zegarku udostępnianie tętna (czasem nazywa się „HR broadcast”) albo użyj pasa na klatkę.':'Błąd tętna: '+e.message}
 };
 
