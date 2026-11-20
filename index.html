@@ -305,7 +305,7 @@ function intTick(){if(!I.on)return;const t=curSecs(),done=curDist()-I.startD;
   if(!I.last&&ICFG.m>=300&&done>=ICFG.m-100){I.last=true;cue('Jeszcze 100 metrów!',[880])}
   if(done>=ICFG.m){S.iLog.push(t-I.startT);
    if(I.rep>=ICFG.reps){intEnd('Koniec interwałów! Świetna robota.');return}
-   I.phase='rest';I.startT=t;I.ten=false;say((ctlOk?'':'Zwolnij do marszu. ')+'Przerwa '+ICFG.rest+' sekund. Odcinek w '+paceWords(S.iLog[S.iLog.length-1]).replace(' ',' minuty ')+'.');beep([523],0.25);setSpeedAbs(5);try{navigator.vibrate(500)}catch(e){}}}
+   I.phase='rest';I.startT=t;I.ten=false;say((ctlOk?'':'Zwolnij do marszu. ')+'Przerwa '+ICFG.rest+' sekund. Odcinek '+durW(S.iLog[S.iLog.length-1])+'.');beep([523],0.25);setSpeedAbs(5);try{navigator.vibrate(500)}catch(e){}}}
  else if(I.phase==='rest'){const left=ICFG.rest-(t-I.startT);
   if(!I.ten&&left<=10&&left>4&&ICFG.rest>=20){I.ten=true;say('Za 10 sekund '+(I.rep+1===ICFG.reps?'ostatnie':'następne')+' powtórzenie.')}
   if(left<=3&&left>0&&I.cd!==Math.ceil(left)){I.cd=Math.ceil(left);beep([660],0.08)}
