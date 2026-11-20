@@ -159,13 +159,15 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
 </div>
 <div class="st">Głos prowadzi cały trening: rozgrzewka → powtórzenia (połowa, ostatnie 100 m) → przerwy z odliczaniem → schłodzenie. Prędkość zmieniasz przyciskami na bieżni, kiedy usłyszysz polecenie.</div>
 
-<h2>Sterowanie</h2>
+<details><summary>Sterowanie bieżnią z telefonu (dla innych bieżni)</summary>
+<div class="st" style="margin-top:8px">Bieżnie Star Trac na Twojej siłowni nie przyjmują poleceń z telefonu (test 18.11.2026) – prędkość zmieniasz na konsoli. To przydaje się tylko na innej bieżni.</div>
 <div class="st" id="ctlInfo">Połącz się, a potem kliknij „Sprawdź sterowanie”. Taśmę zawsze uruchamiasz na bieżni.</div>
 <div class="btns"><button id="probe" disabled>Sprawdź sterowanie</button></div>
 <div class="ctl" id="ctl" hidden>
  <div class="t"><div class="l">Prędkość</div><div class="row"><button id="sDn" aria-label="Wolniej">−</button><button id="sUp" aria-label="Szybciej">+</button></div><div class="st">krok 0,5 km/h, maks. 16</div></div>
  <div class="t"><div class="l">Nachylenie</div><div class="row"><button id="iDn" aria-label="Mniejsze nachylenie">−</button><button id="iUp" aria-label="Większe nachylenie">+</button></div><div class="st">krok 0,5%, 0–12%</div></div>
 </div>
+</details>
 
 <h2>Statystyki</h2>
 <div class="chart"><canvas id="weeks" aria-label="Kilometry w tygodniach"></canvas><div class="st" id="weekTxt"></div></div>
@@ -616,8 +618,15 @@ function renderHist(){
   const tb=document.createElement('button');tb.textContent='🟠 Pobierz TCX do Stravy';tb.onclick=()=>downloadTcx(x);
   const sb=document.createElement('button');sb.textContent='📤 Wyślij raport';sb.className='p';sb.onclick=()=>shareRun(x);
   const bw=document.createElement('div');bw.className='btns';bw.append(sb,tb);
-  d.append(p,bw);$('hist').append(d)});
+  const sh=document.createElement('div');sh.className='btns';sh.style.marginTop='10px';
+  const sl=document.createElement('div');sl.className='st';sl.style.marginTop='10px';sl.textContent='Buty w tym biegu (kliknij, żeby zmienić):';
+  SHOES.forEach(n=>{const b=document.createElement('button');b.textContent=n;if(n===x.shoes)b.className='on';b.onclick=()=>setRunShoes(x,n);sh.append(b)});
+  d.append(p,bw,sl,sh);$('hist').append(d)});
 }
+function setRunShoes(x,n){if(x.shoes===n)return;const h=store.get('historia',[]);const r=h.find(y=>y.date===x.date&&y.km===x.km);if(!r)return;
+ const old=r.shoes;r.shoes=n;if(r.txt)r.txt=r.txt.replace('Buty: '+old,'Buty: '+n);store.set('historia',h);renderHist();
+ const op=[...$('hist').querySelectorAll('details')][h.indexOf(r)];if(op)op.open=true;
+ $('bkInfo').textContent='Zmieniono buty: '+old+' → '+n+'. Zapisz kopię historii, żeby zmiana była też w pliku.'}
 reset();render();renderHist();drawChart($('live'),[]);addEventListener('resize',()=>drawChart($('live'),S.prof));
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
