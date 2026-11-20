@@ -154,7 +154,10 @@ summary{cursor:pointer;color:var(--mut);font-size:14px}
  <label for="iM">Metry</label><input id="iM" type="number" inputmode="numeric" min="100" max="5000" step="50">
  <label for="iRest">Przerwa s</label><input id="iRest" type="number" inputmode="numeric" min="10" max="600" step="5">
  <label for="iSpd">km/h</label><input id="iSpd" type="number" inputmode="decimal" min="5" max="16" step="0.5">
+ <label for="iWu">Rozgrzewka km</label><input id="iWu" type="number" inputmode="decimal" min="0" max="5" step="0.5">
+ <label for="iCd">Schłodzenie km</label><input id="iCd" type="number" inputmode="decimal" min="0" max="5" step="0.5">
 </div>
+<div class="st">Głos prowadzi cały trening: rozgrzewka → powtórzenia (połowa, ostatnie 100 m) → przerwy z odliczaniem → schłodzenie. Prędkość zmieniasz przyciskami na bieżni, kiedy usłyszysz polecenie.</div>
 
 <h2>Sterowanie</h2>
 <div class="st" id="ctlInfo">Połącz się, a potem kliknij „Sprawdź sterowanie”. Taśmę zawsze uruchamiasz na bieżni.</div>
@@ -272,25 +275,50 @@ function renderGoal(){if(!GOAL){$('goalBar').hidden=$('goalTxt').hidden=true;ret
  if(km>=GOAL&&!S.goalDone&&!$('stop').disabled){S.goalDone=true;beep([523,659,784,1047],0.16);try{navigator.vibrate([200,100,200,100,600])}catch(e){}setTimeout(()=>say('Cel osiągnięty! '+nf(GOAL,1).replace(',',' i ')+' kilometra. Brawo!'),900)}}
 
 /* ---------- interwały ---------- */
-let ICFG=Object.assign({reps:5,m:600,rest:90,spd:12},store.get('interwaly',{})),I={on:false},ctlOk=false;
-['Reps','M','Rest','Spd'].forEach(k=>{const key={Reps:'reps',M:'m',Rest:'rest',Spd:'spd'}[k];$('i'+k).value=ICFG[key];$('i'+k).onchange=e=>{const v=+e.target.value;if(v>0){ICFG[key]=v;store.set('interwaly',ICFG)}else e.target.value=ICFG[key]}});
+let ICFG=Object.assign({reps:5,m:600,rest:90,spd:12,wu:2,cd:1},store.get('interwaly',{})),I={on:false},ctlOk=false;
+const kmW=v=>{const w=Number.isInteger(v)?String(v):String(v).replace('.5',' i pół').replace('.',',');return w+' '+(v===1?'kilometr':Number.isInteger(v)&&v>=2&&v<=4?'kilometry':Number.isInteger(v)?'kilometrów':'kilometra')};
+const spdW=v=>(Number.isInteger(v)?String(v):String(v).replace('.',' i pół').replace(' i pół5',' i pół'))+' kilometrów na godzinę';
+['Reps','M','Rest','Spd','Wu','Cd'].forEach(k=>{const key={Reps:'reps',M:'m',Rest:'rest',Spd:'spd',Wu:'wu',Cd:'cd'}[k];$('i'+k).value=ICFG[key];$('i'+k).onchange=e=>{const v=+e.target.value;if(v>0||((key==='wu'||key==='cd')&&v===0)){ICFG[key]=v;store.set('interwaly',ICFG)}else e.target.value=ICFG[key]}});
 async function setSpeedAbs(v){if(!cp||!ctlOk)return;try{await cpSend([0x02,...new Uint8Array(new Uint16Array([Math.round(Math.min(16,v)*100)]).buffer)])}catch(e){}}
-function intStartRep(){I.phase='work';I.startD=curDist();I.startT=curSecs();
- say(I.rep===ICFG.reps?'Ostatnie powtórzenie! Start!':'Powtórzenie '+I.rep+' z '+ICFG.reps+'. Start!');beep([988,988],0.12);try{navigator.vibrate([300,100,300])}catch(e){}setSpeedAbs(ICFG.spd);setPlan('int')}
-$('iStart').onclick=()=>{unlockAudio();I={on:true,rep:1,cd:-1};S.iLog=[];$('iStart').hidden=true;$('iStop').hidden=false;$('iPanel').hidden=false;intStartRep();intRender()};
-$('iStop').onclick=()=>intEnd('Interwały przerwane.');
-function intEnd(msg){I.on=false;$('iStart').hidden=false;$('iStop').hidden=true;$('iPanel').className='ipanel';$('iPh').textContent='Koniec';$('iVal').textContent=S.iLog.length+' × '+ICFG.m+' m';
- $('iSub').textContent=S.iLog.map((x,i)=>(i+1)+': '+fmtT(x)).join(' · ');say(msg);beep([784,659,523],0.18);setSpeedAbs(5)}
-function intTick(){if(!I.on)return;const t=curSecs();
- if(I.phase==='work'){const done=curDist()-I.startD;if(done>=ICFG.m){S.iLog.push(t-I.startT);
-   if(I.rep>=ICFG.reps){intEnd('Koniec interwałów! Świetna robota. Teraz spokojne schłodzenie.');return}
-   I.phase='rest';I.startT=t;say('Przerwa '+ICFG.rest+' sekund. Odcinek w '+paceWords(S.iLog[S.iLog.length-1]).replace(' ',' minuty ')+'.');beep([523],0.25);setSpeedAbs(5);try{navigator.vibrate(500)}catch(e){}}}
- else{const left=ICFG.rest-(t-I.startT);if(left<=3&&left>0&&I.cd!==Math.ceil(left)){I.cd=Math.ceil(left);beep([660],0.08)}
+const plF=(n,a,b,c)=>n===1?a:(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20))?b:c;
+function durW(sec){sec=Math.round(sec);const m=Math.floor(sec/60),x=sec%60;return (m?m+' '+plF(m,'minuta','minuty','minut'):'')+(x?' '+x+' '+plF(x,'sekunda','sekundy','sekund'):'')}
+function cue(t,b){say(t);if(b)beep(b,0.12)}
+function intStartRep(){I.phase='work';I.startD=curDist();I.startT=curSecs();I.half=I.last=false;
+ const first=I.rep===1,last=I.rep===ICFG.reps;
+ say((last?'Ostatnie powtórzenie!':'Powtórzenie '+I.rep+' z '+ICFG.reps+'.')+(ctlOk?'':(first?' Przyspiesz do '+spdW(ICFG.spd)+'.':' Przyspiesz do '+ICFG.spd+'.'))+' Start!');
+ beep([988,988],0.12);try{navigator.vibrate([300,100,300])}catch(e){}setSpeedAbs(ICFG.spd);setPlan('int')}
+function intStartWu(){I.phase='wu';I.startD=curDist();I.startT=curSecs();I.wuHalf=I.wuSoon=false;
+ say('Zaczynamy. Rozgrzewka '+kmW(ICFG.wu)+', spokojnie, 9 do 10 kilometrów na godzinę. Powiem, kiedy przyspieszyć.')}
+$('iStart').onclick=()=>{unlockAudio();I={on:true,rep:1,cd:-1};S.iLog=[];$('iStart').hidden=true;$('iStop').hidden=false;$('iPanel').hidden=false;if(ICFG.wu>0)intStartWu();else intStartRep();intRender()};
+$('iStop').onclick=()=>intEnd('Interwały przerwane.',true);
+function intEnd(msg,abort){$('iPanel').className='ipanel';$('iVal').textContent=S.iLog.length+' × '+ICFG.m+' m';$('iSub').textContent=S.iLog.map((x,i)=>(i+1)+': '+fmtT(x)).join(' · ');setSpeedAbs(5);
+ if(!abort&&ICFG.cd>0&&I.phase==='work'){I.phase='cd';I.startD=curDist();I.startT=curSecs();I.cdHalf=false;$('iPh').textContent='🧊 Schłodzenie';
+  say(msg+' Zwolnij do 8 kilometrów na godzinę. Schłodzenie '+kmW(ICFG.cd)+'.');beep([784,659,523],0.18);return}
+ I.on=false;$('iStart').hidden=false;$('iStop').hidden=true;$('iPh').textContent='Koniec';say(msg);beep([784,659,523],0.18)}
+function intTick(){if(!I.on)return;const t=curSecs(),done=curDist()-I.startD;
+ if(I.phase==='wu'){const tot=ICFG.wu*1000;
+  if(!I.wuHalf&&done>=tot/2&&tot>=1000){I.wuHalf=true;say('Połowa rozgrzewki. Luźno.')}
+  if(!I.wuSoon&&done>=tot-200){I.wuSoon=true;cue('Za 200 metrów pierwsze powtórzenie. Przygotuj się.',[660])}
+  if(done>=tot){intStartRep()}}
+ else if(I.phase==='work'){
+  if(!I.half&&ICFG.m>=400&&done>=ICFG.m/2){I.half=true;say('Połowa. Trzymaj tempo.')}
+  if(!I.last&&ICFG.m>=300&&done>=ICFG.m-100){I.last=true;cue('Jeszcze 100 metrów!',[880])}
+  if(done>=ICFG.m){S.iLog.push(t-I.startT);
+   if(I.rep>=ICFG.reps){intEnd('Koniec interwałów! Świetna robota.');return}
+   I.phase='rest';I.startT=t;I.ten=false;say((ctlOk?'':'Zwolnij do marszu. ')+'Przerwa '+ICFG.rest+' sekund. Odcinek w '+paceWords(S.iLog[S.iLog.length-1]).replace(' ',' minuty ')+'.');beep([523],0.25);setSpeedAbs(5);try{navigator.vibrate(500)}catch(e){}}}
+ else if(I.phase==='rest'){const left=ICFG.rest-(t-I.startT);
+  if(!I.ten&&left<=10&&left>4&&ICFG.rest>=20){I.ten=true;say('Za 10 sekund '+(I.rep+1===ICFG.reps?'ostatnie':'następne')+' powtórzenie.')}
+  if(left<=3&&left>0&&I.cd!==Math.ceil(left)){I.cd=Math.ceil(left);beep([660],0.08)}
   if(left<=0){I.rep++;I.cd=-1;intStartRep()}}
+ else if(I.phase==='cd'){const tot=ICFG.cd*1000;
+  if(!I.cdHalf&&tot>=1000&&done>=tot/2){I.cdHalf=true;say('Połowa schłodzenia.')}
+  if(done>=tot){I.phase='end';intEnd('Schłodzenie zakończone. Trening zrobiony! Możesz zatrzymać bieżnię i zakończyć bieg.')}}
  intRender()}
-function intRender(){if(!I.on)return;const P=$('iPanel');P.className='ipanel '+I.phase;
- if(I.phase==='work'){$('iPh').textContent='🔥 Powtórzenie '+I.rep+' / '+ICFG.reps;$('iVal').textContent=Math.max(0,Math.round(ICFG.m-(curDist()-I.startD)))+' m';$('iSub').textContent='zostało · czas '+fmtT(curSecs()-I.startT)+(ctlOk?' · bieżnia ustawiona na '+nf(ICFG.spd,1)+' km/h':' · ustaw '+nf(ICFG.spd,1)+' km/h')}
- else{$('iPh').textContent='😮‍💨 Przerwa · marsz';$('iVal').textContent=fmtT(Math.max(0,ICFG.rest-(curSecs()-I.startT)));$('iSub').textContent='następne: '+(I.rep+1)+' / '+ICFG.reps}}
+function intRender(){if(!I.on)return;const P=$('iPanel'),done=curDist()-I.startD;P.className='ipanel '+(I.phase==='work'?'work':'rest');
+ if(I.phase==='wu'){$('iPh').textContent='🔥 Rozgrzewka';$('iVal').textContent=Math.max(0,Math.round(ICFG.wu*1000-done))+' m';$('iSub').textContent='spokojnie 9–10 km/h · potem '+ICFG.reps+' × '+ICFG.m+' m'}
+ else if(I.phase==='work'){$('iPh').textContent='🔥 Powtórzenie '+I.rep+' / '+ICFG.reps;$('iVal').textContent=Math.max(0,Math.round(ICFG.m-done))+' m';$('iSub').textContent='zostało · czas '+fmtT(curSecs()-I.startT)+(ctlOk?' · bieżnia ustawiona na '+nf(ICFG.spd,1)+' km/h':' · ustaw '+nf(ICFG.spd,1)+' km/h')}
+ else if(I.phase==='rest'){$('iPh').textContent='😮‍💨 Przerwa · marsz';$('iVal').textContent=fmtT(Math.max(0,ICFG.rest-(curSecs()-I.startT)));$('iSub').textContent='następne: '+(I.rep+1)+' / '+ICFG.reps}
+ else if(I.phase==='cd'){$('iPh').textContent='🧊 Schłodzenie';$('iVal').textContent=Math.max(0,Math.round(ICFG.cd*1000-done))+' m';$('iSub').textContent='luźno ok. 8 km/h · '+S.iLog.map((x,i)=>(i+1)+': '+fmtT(x)).join(' · ')}}
 
 /* ---------- statystyki i rekordy ---------- */
 function weekKey(ts){const d=new Date(ts);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime()}
@@ -330,7 +358,7 @@ function say(t){try{if(!('speechSynthesis' in window))return;const u=new SpeechS
 try{speechSynthesis.onvoiceschanged=()=>{}}catch(e){}
 const ORD=['','pierwszy','drugi','trzeci','czwarty','piąty','szósty','siódmy','ósmy','dziewiąty','dziesiąty','jedenasty','dwunasty','trzynasty','czternasty','piętnasty','szesnasty','siedemnasty','osiemnasty','dziewiętnasty','dwudziesty','dwudziesty pierwszy','dwudziesty drugi'];
 function paceWords(sec){sec=Math.round(sec);const m=Math.floor(sec/60),x=sec%60;return m+' '+(x<10?'zero '+x:x)}
-function announceKm(n,splitSec){if(!VOICE)return;
+function announceKm(n,splitSec){if(!VOICE||(I.on&&I.phase!=='cd'&&I.phase!=='wu'))return;
  let t='Kilometr '+(ORD[n]||n)+'. Tempo '+paceWords(splitSec)+'.';
  if(S.hrLive&&S.hr)t+=' Tętno '+S.hr+'.';
  if(S.splits.length>1){const prev=S.splits[S.splits.length-2],d=Math.round(splitSec-prev);if(Math.abs(d)>=5)t+=d<0?' Szybciej o '+(-d)+' sekund.':' Wolniej o '+d+' sekund.'}
